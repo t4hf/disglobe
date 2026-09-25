@@ -1,0 +1,15 @@
+# local runtime data — never push accounts/messages
+disglobe-data/
+
+# build artifacts
+dist/
+node_modules/
+node-portable/
+
+# Windows/OneDrive noise
+*.log
+thumbs.db
+desktop.ini
+
+# local-only config (has your personal server URL after you set it)
+disglobe.config.json

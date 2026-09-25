@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: disglobe
+    runtime: node
+    plan: free
+    buildCommand: "npm install --omit=dev"
+    startCommand: "node server.js"
+    healthCheckPath: /api/ping
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+
+  - type: pg
+    name: disglobe-db
+    plan: free
+    databaseName: disglobe
+    user: disglobe
+    ipAllowList: []
