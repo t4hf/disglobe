@@ -1631,7 +1631,7 @@ function localViewFromWorld(w) {
   const unreads = {};
   for (const s of w.servers) for (const c of s.categories) for (const ch of c.channels) unreads[`s:${s.id}:${ch.id}`] = false;
   return {
-    user: { name: currentUser, ...(w.profile || {}), avatar: w.profile?.avatarData ? { dataUrl: w.profile.avatarData } : null, banner: w.profile?.bannerData ? { dataUrl: w.profile.bannerData } : null },
+    user: { name: currentUser, ...(w.profile || {}), avatar: w.profile?.avatarData ? { dataUrl: w.profile.avatarData } : null, banner: w.profile?.bannerData ? { dataUrl: w.profile.bannerData } : null, avatarData: w.profile?.avatarData || null, bannerData: w.profile?.bannerData || null },
     servers: w.servers,
     dms: (w.dmPartners || []).map(p => p.name),
     friends: w.friends || [],
@@ -1691,6 +1691,7 @@ async function tryResumeSession() {
     db = localViewFromWorld(w);
     applyTheme();
     const auth = $("#auth"); if (auth) { auth.style.display = "none"; auth.classList.add("hide"); }
+    loadProfileMedia().then(() => { if (currentUser === s) renderAll(); });
     renderAll();
     sseConnect();
     checkPendingInvite();
@@ -1899,7 +1900,20 @@ async function loadProfileMedia() {
   for (const slot of ["avatar", "banner"]) {
     if (mediaUrls[slot]) { URL.revokeObjectURL(mediaUrls[slot]); mediaUrls[slot] = null; }
     const meta = db.user[slot];
-    if (!meta) continue;
+    if (!meta) {
+      /* no local blob — but the server may have the image (synced from another device);
+         seed IndexedDB from the world payload's avatarData/bannerData */
+      const dataUrl = slot === "avatar" ? db.user.avatarData : db.user.bannerData;
+      if (dataUrl) {
+        try {
+          const blob = dataUrlToBlob(dataUrl);
+          await IDB.put(`pf:${currentUser}:${slot}`, blob);
+          mediaUrls[slot] = URL.createObjectURL(blob);
+          db.user[slot] = { synced: true };
+        } catch {}
+      }
+      continue;
+    }
     const blob = await IDB.get(`pf:${currentUser}:${slot}`);
     if (blob) mediaUrls[slot] = URL.createObjectURL(blob);
     else db.user[slot] = null; // blob vanished (cleared site data) — fall back to initials
@@ -1959,13 +1973,35 @@ function loadWorld() {
   applyTheme();
 }
 function save() { return true; } /* the server persists everything; kept for call sites */
-function persistProfile() {
-  /* push the whole profile to the server */
+function persistProfile(changedSlots) {
+  /* push the whole profile to the server, including avatar/banner as data URLs
+     so they follow the account to any device (server caps: 2 MB avatar, 3 MB banner).
+     changedSlots: optional array like ["avatar","banner"] or ["avatar"] — when given,
+     only those image slots are uploaded. Call sites that just change text fields omit it. */
   const u = db.user;
-  api("/api/me", { body: {
+  const slots = Array.isArray(changedSlots) ? changedSlots : [];
+  const body = {
     displayName: u.displayName, pronouns: u.pronouns, customStatus: u.customStatus, bio: u.bio,
     color: u.color, status: u.status, nameEffect: u.nameEffect, profileEffect: u.profileEffect, badges: u.badges,
-  } }).then(refreshWorld).catch(e => toast(e.message));
+  };
+  (async () => {
+    try {
+      for (const slot of slots) {
+        const blob = u[slot] ? await IDB.get(`pf:${currentUser}:${slot}`) : null;
+        if (blob) {
+          const dataUrl = await blobToDataUrl(blob);
+          if (dataUrl.length >= (slot === "avatar" ? 2 : 3) * 1024 * 1024) {
+            toast(`Your ${slot} is too large to sync (${fmtSize(dataUrl.length)}) — shown locally only`);
+            continue;
+          }
+          body[slot === "avatar" ? "avatarData" : "bannerData"] = dataUrl;
+        } else if (u[slot] === null) {
+          body[slot === "avatar" ? "avatarData" : "bannerData"] = null; // user cleared it — clear server-side too
+        }
+      }
+    } catch {}
+    api("/api/me", { body }).then(refreshWorld).catch(e => toast(e.message));
+  })();
 }
 
 /* ---------- lookups ---------- */
@@ -3089,21 +3125,24 @@ function wireProfileEditor(pane, u) {
     u.nameEffect = nameFx;
     u.profileEffect = profFx;
     u.badges = badges;
+    const pushed = [];
     for (const slot of ["avatar", "banner"]) {
       const d = draft[slot];
       if (d === null) {
         try { await IDB.del(`pf:${currentUser}:${slot}`); } catch {}
         if (mediaUrls[slot]) { URL.revokeObjectURL(mediaUrls[slot]); mediaUrls[slot] = null; }
         u[slot] = null;
+        pushed.push(slot);
       } else if (d && d.blob) {
         try { await IDB.put(`pf:${currentUser}:${slot}`, d.blob); }
         catch { toast("Couldn't store the image (storage full?)"); continue; }
         if (mediaUrls[slot]) URL.revokeObjectURL(mediaUrls[slot]);
         mediaUrls[slot] = d.url;
         u[slot] = { name: d.name, size: d.size, animated: d.animated };
+        pushed.push(slot);
       }
     }
-    save(); persistProfile(); renderAll(); toast("Profile updated ✨");
+    save(); persistProfile(pushed); renderAll(); toast("Profile updated ✨");
   };
 }
 function modalEmail(current) {
@@ -3711,21 +3750,24 @@ function modalSettings() {
     u.customStatus = $("#stCustom").value.trim();
     u.bio = $("#stBio").value.trim();
     u.color = color;
+    const pushed = [];
     for (const slot of ["avatar", "banner"]) {
       const d = draft[slot];
       if (d === null) { // cleared
         try { await IDB.del(`pf:${currentUser}:${slot}`); } catch {}
         if (mediaUrls[slot]) { URL.revokeObjectURL(mediaUrls[slot]); mediaUrls[slot] = null; }
         u[slot] = null;
+        pushed.push(slot);
       } else if (d && d.blob) { // newly staged
         try { await IDB.put(`pf:${currentUser}:${slot}`, d.blob); }
         catch { toast("Couldn't store the image (storage full?)"); continue; }
         if (mediaUrls[slot]) URL.revokeObjectURL(mediaUrls[slot]);
         mediaUrls[slot] = d.url;
         u[slot] = { name: d.name, size: d.size, animated: d.animated };
+        pushed.push(slot);
       }
     }
-    closeModal(); save(); persistProfile(); renderAll(); toast("Profile updated ✨");
+    closeModal(); save(); persistProfile(pushed); renderAll(); toast("Profile updated ✨");
   };
   $("#stName").focus();
 }

@@ -169,7 +169,7 @@ function worldFor(name) {
   const msgs = {};
   keys.forEach(k => { msgs[k] = db.msgs[k] || []; });
   return {
-    profile: userPublic(db.users[name]).profile,
+    profile: { ...userPublic(db.users[name]).profile, avatarData: db.users[name].avatarData || null, bannerData: db.users[name].bannerData || null },
     servers, msgs,
     friends: (db.friends[name] || []).map(n => userPublic(userByName(n))).filter(Boolean),
     requests: (db.requests[name] || []).map(r => ({ ...userPublic(userByName(r.from)), ts: r.ts })).filter(Boolean),
