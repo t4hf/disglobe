@@ -1,0 +1,46 @@
+{
+  "name": "disglobe",
+  "productName": "Disglobe",
+  "version": "2.0.2",
+  "description": "Disglobe — an original Discord-style chat world: accounts, servers, DMs, voice and screenshare in one zero-dependency app",
+  "main": "main.js",
+  "author": "Disglobe",
+  "scripts": {
+    "start": "electron .",
+    "host": "electron . --host",
+    "server": "node server.js",
+    "dist": "electron-builder --win --config disglobe.build.json"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "optionalDependencies": {
+    "ws": "^8.18.0",
+    "pg": "^8.13.0"
+  },
+  "build": {
+    "appId": "chat.disglobe.app",
+    "productName": "Disglobe",
+    "files": [
+      "main.js",
+      "preload.js",
+      "server.js",
+      "disglobe.html",
+      "splash.html",
+      "package.json",
+      "build/disglobe.ico"
+    ],
+    "asarUnpack": [
+      "build/disglobe.ico"
+    ],
+    "win": {
+      "target": [
+        "portable"
+      ],
+      "icon": "build/disglobe.ico",
+      "signAndEditExecutable": false
+    }
+  },
+  "license": "MIT"
+}

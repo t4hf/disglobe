@@ -1,0 +1,24 @@
+{
+  "appId": "chat.disglobe.app",
+  "productName": "Disglobe",
+  "files": [
+    "main.js",
+    "preload.js",
+    "server.js",
+    "disglobe.html",
+    "splash.html",
+    "disglobe.config.json",
+    "package.json",
+    "build/disglobe.ico"
+  ],
+  "asarUnpack": [
+    "build/disglobe.ico"
+  ],
+  "win": {
+    "target": [
+      "portable"
+    ],
+    "icon": "build/disglobe.ico",
+    "signAndEditExecutable": false
+  }
+}

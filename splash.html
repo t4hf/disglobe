@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Disglobe</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: rgba(11, 9, 20, 0.95);
+    border-radius: 16px;
+    user-select: none;
+    cursor: default;
+  }
+
+  /* ---------- logo ---------- */
+  .logo {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 46px;
+    font-weight: 700;
+    letter-spacing: 7px;
+    color: #e8ddff;
+    text-shadow:
+      0 0 8px rgba(167, 122, 255, 0.9),
+      0 0 22px rgba(129, 82, 255, 0.65),
+      0 0 48px rgba(88, 44, 220, 0.45),
+      0 0 90px rgba(60, 20, 180, 0.3);
+    animation: floatUp 2.6s cubic-bezier(0.22, 0.61, 0.36, 1) infinite alternate;
+    will-change: transform, opacity;
+  }
+
+  @keyframes floatUp {
+    from { transform: translate(-50%, -46%) scale(1); opacity: 0.88; }
+    to   { transform: translate(-50%, -54%) scale(1.03); opacity: 1; }
+  }
+
+  /* ---------- star particles ---------- */
+  .stars {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+  }
+  .star {
+    position: absolute;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #ffffff 0%, #b98fff 55%, rgba(129, 82, 255, 0) 100%);
+    box-shadow: 0 0 6px rgba(190, 150, 255, 0.9);
+    animation: explode var(--dur, 2.4s) cubic-bezier(0.16, 0.84, 0.44, 1) infinite;
+    will-change: transform, opacity;
+  }
+  @keyframes explode {
+    0%   { transform: translate(0, 0) scale(0.2); opacity: 0; }
+    12%  { opacity: var(--peak, 0.9); }
+    100% { transform: translate(var(--tx), var(--ty)) scale(1.6); opacity: 0; }
+  }
+
+  /* ---------- loading dots ---------- */
+  .dots {
+    position: absolute;
+    left: 50%;
+    bottom: 44px;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 9px;
+  }
+  .dots span {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #a77aff;
+    animation: pulse 1.2s ease-in-out infinite;
+    will-change: opacity, transform;
+  }
+  .dots span:nth-child(2) { animation-delay: 0.2s; }
+  .dots span:nth-child(3) { animation-delay: 0.4s; }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 0.25; transform: scale(0.8); }
+    50%      { opacity: 1;    transform: scale(1.15); }
+  }
+
+  /* ---------- fade out on handoff ---------- */
+  body.fading {
+    transition: opacity 0.45s ease;
+    opacity: 0;
+  }
+</style>
+</head>
+<body>
+  <div class="stars" id="stars"></div>
+  <div class="logo">Disglobe</div>
+  <div class="dots"><span></span><span></span><span></span></div>
+
+<script>
+  /* Generate 26 star particles exploding outward from the center,
+     each with a random direction, distance, size, and timing. */
+  (function () {
+    var container = document.getElementById("stars");
+    var COUNT = 26;
+    for (var i = 0; i < COUNT; i++) {
+      var s = document.createElement("div");
+      s.className = "star";
+      /* random angle around the center */
+      var angle = (Math.PI * 2 * i) / COUNT + Math.random() * 0.5;
+      /* distance: 60 – 150 px outward */
+      var dist = 60 + Math.random() * 90;
+      var tx = Math.cos(angle) * dist;
+      var ty = Math.sin(angle) * dist;
+      /* size 2–6px, duration 1.8–2.8s, staggered start */
+      var size = 2 + Math.random() * 4;
+      var dur = 1.8 + Math.random() * 1.0;
+      var delay = Math.random() * 1.4;
+      var peak = 0.55 + Math.random() * 0.4;
+      s.style.width = size + "px";
+      s.style.height = size + "px";
+      s.style.setProperty("--tx", tx + "px");
+      s.style.setProperty("--ty", ty + "px");
+      s.style.setProperty("--dur", dur + "s");
+      s.style.setProperty("--peak", peak);
+      s.style.animationDelay = delay + "s";
+      container.appendChild(s);
+    }
+  })();
+
+  /* main.js adds the .fading class to fade us out before closing */
+</script>
+</body>
+</html>
