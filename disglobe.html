@@ -111,6 +111,15 @@
   .rail-item.active.home { background: var(--accent-dim); color: var(--accent); box-shadow: 0 0 0 1.5px rgba(157,78,221,.45), 0 0 14px 3px var(--glow-soft); }
   .rail-item.home { background: var(--card); }
   .rail-item.home svg { width: 28px; height: 28px; }
+  .rail-item.dm-av-chip { overflow: visible; }
+  .rail-item.dm-av-chip .av { width: 44px; height: 44px; font-size: 16px; }
+  .rail-item.dm-av-chip .av .st { width: 14px; height: 14px; border-width: 3px; }
+  .rail-item.dm-av-chip.unread::after {
+    content: ""; position: absolute; top: 4px; right: 4px; width: 10px; height: 10px;
+    border-radius: 50%; background: var(--text); border: 2px solid var(--bg, #0d0a15);
+    animation: dmDotPulse 1.6s ease-in-out infinite;
+  }
+  @keyframes dmDotPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.25); } }
   .rail-pill {
     position: absolute; left: -14px; width: 4px; border-radius: 0 4px 4px 0;
     background: var(--text); transition: height .18s ease, opacity .18s ease;
@@ -1182,7 +1191,15 @@ async function connectVoiceAudio() {
 }
 function stopShare() {
   const c = window.__call;
-  if (c.shareStream) { c.shareStream.getTracks().forEach(t => t.stop()); c.shareStream = null; }
+  if (c.shareStream) {
+    /* remove the tracks from live peers so viewers' streams end cleanly */
+    const dead = [...c.shareStream.getTracks()];
+    rtcPeers.forEach(pc => {
+      pc.getSenders().filter(s => s.track && dead.includes(s.track)).forEach(s => { try { pc.removeTrack(s); } catch {} });
+    });
+    c.shareStream.getTracks().forEach(t => t.stop());
+    c.shareStream = null;
+  }
   c.shareQuality = c.shareQuality || "720:30";
   $("#streamView").classList.remove("show");
   const v = $("#svVideo"); if (v) v.srcObject = null;
@@ -1191,7 +1208,14 @@ function stopShare() {
 }
 function stopCam() {
   const c = window.__call;
-  if (c.camStream) { c.camStream.getTracks().forEach(t => t.stop()); c.camStream = null; }
+  if (c.camStream) {
+    const dead = [...c.camStream.getTracks()];
+    rtcPeers.forEach(pc => {
+      pc.getSenders().filter(s => s.track && dead.includes(s.track)).forEach(s => { try { pc.removeTrack(s); } catch {} });
+    });
+    c.camStream.getTracks().forEach(t => t.stop());
+    c.camStream = null;
+  }
   announceVoice();
   renderSidebar();
 }
@@ -1223,8 +1247,14 @@ async function startShare() {
     }
     window.__call.shareStream = stream;
     stream.getVideoTracks()[0].addEventListener("ended", () => stopShare());
-    openStreamView();
     announceVoice();
+    /* add the screen to every live peer connection — renegotiation pushes it out */
+    rtcPeers.forEach((pc, peerName) => {
+      try {
+        stream.getTracks().forEach(t => pc.addTrack(t, stream));
+      } catch (e) { console.warn("share addTrack failed for", peerName, e); }
+    });
+    openStreamView();
     renderSidebar();
     toast(`🖥️ Sharing at ${shareQualityLabel()}`);
   } catch (e) { if (e.name !== "NotAllowedError") toast("Couldn't start screenshare: " + e.message); }
@@ -1264,9 +1294,19 @@ async function toggleCam() {
   try {
     window.__call.camStream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
     announceVoice();
+    /* add the camera to every live peer connection — onnegotiationneeded fires
+       and the new video track reaches everyone in the channel */
+    rtcPeers.forEach((pc, peerName) => {
+      try {
+        window.__call.camStream.getTracks().forEach(t => pc.addTrack(t, window.__call.camStream));
+      } catch (e) { console.warn("cam addTrack failed for", peerName, e); }
+    });
     renderSidebar();
     toast("📷 Camera on");
-  } catch (e) { if (e.name !== "NotAllowedError") toast("Camera unavailable: " + e.message); }
+  } catch (e) {
+    if (e.name === "NotAllowedError") toast("📷 Camera permission denied — allow camera access and try again");
+    else toast("Camera unavailable: " + e.message);
+  }
 }
 
 /* ================= WebRTC broadcast: my streams go to everyone in the channel =================
@@ -1373,45 +1413,33 @@ function makePeer(peerName, isCaller) {
   if (db.ui.voice && mic) mic.getAudioTracks().forEach(t => pc.addTrack(t, mic));
   pc.onicecandidate = e => { if (e.candidate) api("/api/rtc/signal", { body: { to: peerName, signal: JSON.stringify({ ice: e.candidate }) } }).catch(() => {}); };
   pc.onconnectionstatechange = () => { if (["failed", "closed"].includes(pc.connectionState)) dropPeer(peerName); };
-  if (isCaller) {
-    pc.onnegotiationneeded = async () => {
-      try {
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        await api("/api/rtc/signal", { body: { to: peerName, signal: JSON.stringify({ sdp: pc.localDescription }) } });
-      } catch {}
-    };
-  } else {
-    const bindRemote = track => {
-      if (!track) return;
-      track.addEventListener("unmute", () => ingestRemote());
-      let ms = rtcIncoming.get(peerName);
-      if (!ms) { ms = new MediaStream([track]); rtcIncoming.set(peerName, ms); }
-      else if (!ms.getTracks().includes(track)) ms.addTrack(track);
-    };
-    pc.ontrack = e => {
-      const remote = e.streams && e.streams[0];
-      if (remote) { rtcIncoming.set(peerName, remote); }
-      else if (e.track) { bindRemote(e.track); }
-      /* play their voice */
-      if (e.track && e.track.kind === "audio") attachRemoteAudio(peerName, new MediaStream([e.track]));
-      renderVoiceMembers();
-    };
-    /* answerer-side transceivers can predate ontrack: sweep receivers periodically */
-    const sweep = setInterval(() => {
-      if (!rtcPeers.has(peerName)) return clearInterval(sweep);
-      let got = false;
-      (pc.getReceivers() || []).forEach(r => {
-        if (r.track && r.track.readyState === "live") {
-          bindRemote(r.track);
-          if (r.track.kind === "audio") attachRemoteAudio(peerName, new MediaStream([r.track]));
-          got = true;
-        }
-      });
-      if (got && rtcIncoming.has(peerName)) { renderVoiceMembers(); clearInterval(sweep); }
-    }, 700);
-    setTimeout(() => clearInterval(sweep), 20000);
-  }
+  /* perfect negotiation: both sides may add tracks (camera/screen/mic) at any time.
+     "polite" peer (higher username) yields on offer glare; the other keeps its offer. */
+  const polite = currentUser > peerName;
+  pc._polite = polite;
+  pc.onnegotiationneeded = async () => {
+    try {
+      pc._makingOffer = true;
+      await pc.setLocalDescription();
+      await api("/api/rtc/signal", { body: { to: peerName, signal: JSON.stringify({ sdp: pc.localDescription }) } });
+    } catch {}
+    finally { pc._makingOffer = false; }
+  };
+  const bindRemote = track => {
+    if (!track) return;
+    track.addEventListener("unmute", () => ingestRemote());
+    let ms = rtcIncoming.get(peerName);
+    if (!ms) { ms = new MediaStream([track]); rtcIncoming.set(peerName, ms); }
+    else if (!ms.getTracks().includes(track)) ms.addTrack(track);
+  };
+  pc.ontrack = e => {
+    const remote = e.streams && e.streams[0];
+    if (remote) { rtcIncoming.set(peerName, remote); }
+    else if (e.track) { bindRemote(e.track); }
+    /* play their voice — this is the fix: audio now always arrives */
+    if (e.track && e.track.kind === "audio") attachRemoteAudio(peerName, new MediaStream([e.track]));
+    renderVoiceMembers();
+  };
   return pc;
 }
 function dropPeer(peerName) {
@@ -1430,32 +1458,39 @@ async function handleRtcSignal(from, signal) {
   let pc = rtcPeers.get(from);
   if (signal.sdp) {
     if (!pc) pc = makePeer(from, false);
-    await pc.setRemoteDescription(signal.sdp);
-    if (signal.sdp.type === "offer") {
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      await api("/api/rtc/signal", { body: { to: from, signal: JSON.stringify({ sdp: pc.localDescription }) } });
+    const desc = signal.sdp;
+    const readyForOffer = !pc._makingOffer && (pc.signalingState === "stable" || pc._settingRemoteAnswerPending);
+    const offerCollision = desc.type === "offer" && !readyForOffer;
+    pc._ignoreOffer = !pc._polite && offerCollision;
+    if (pc._ignoreOffer) return;
+    try {
+      pc._settingRemoteAnswerPending = desc.type === "answer";
+      await pc.setRemoteDescription(desc);
+      pc._settingRemoteAnswerPending = false;
+      if (desc.type === "offer") {
+        await pc.setLocalDescription();
+        await api("/api/rtc/signal", { body: { to: from, signal: JSON.stringify({ sdp: pc.localDescription }) } });
+      }
+    } catch (e) {
+      pc._settingRemoteAnswerPending = false;
     }
   } else if (signal.ice && pc) {
-    try { await pc.addIceCandidate(signal.ice); } catch {}
+    try { await pc.addIceCandidate(signal.ice); } catch (e) { if (!pc._ignoreOffer) console.warn("ice:", e); }
   }
 }
 
-/* when voice states change: sync peers (I become caller toward peers already sharing) */
+/* when voice states change: sync peers — EVERYONE in the voice channel connects
+   to everyone else (audio always flows; video adds renegotiation when turned on) */
 function syncVoicePeers(states) {
   if (!db.ui.voice) return dropAllPeers();
   const others = Object.entries(states || {}).filter(([n, s]) => n !== currentUser && s.serverId === db.ui.voice.serverId && s.channelId === db.ui.voice.channelId);
   const names = new Set(others.map(([n]) => n));
-  /* drop peers who left the channel OR stopped sharing (nothing to watch) */
-  const sharingNow = new Set(others.filter(([, s]) => s.sharing).map(([n]) => n));
-  [...rtcPeers.keys()].forEach(n => {
-    if (!names.has(n)) return dropPeer(n);
-    if (!sharingNow.has(n) && !rtcIncoming.has(n)) return; /* idle peer, keep only if sharing */
-    if (!sharingNow.has(n) && rtcIncoming.has(n)) dropPeer(n); /* they stopped sharing */
-  });
-  for (const [n, s] of others) {
-    const iShare = !!(window.__call.shareStream || window.__call.camStream);
-    if (iShare && !rtcPeers.has(n)) makePeer(n, true); /* I'm sharing: connect to everyone */
+  /* drop peers who left the channel */
+  [...rtcPeers.keys()].forEach(n => { if (!names.has(n)) dropPeer(n); });
+  /* deterministic caller direction (lower username calls) avoids glare/double offers */
+  for (const [n] of others) {
+    if (rtcPeers.has(n)) continue;
+    makePeer(n, currentUser < n);
   }
   renderVoiceMembers();
 }
@@ -2009,12 +2044,12 @@ const norm = n => String(n || "").trim().toLowerCase();
 const SYSTEM = { id: "system", name: "System", color: "#8b93a6", status: "online", system: true };
 const displayName = u => (u.displayName || "").trim() || u.name;
 function member(id) {
-  if (id === "me" || id === currentUser) return { ...(db.user || {}), id: "me", name: currentUser, displayName: db.user?.displayName, color: db.user?.color, status: db.user?.status, nameEffect: db.user?.nameEffect, badges: db.user?.badges };
+  if (id === "me" || id === currentUser) return { ...(db.user || {}), id: "me", name: currentUser, displayName: db.user?.displayName, color: db.user?.color, status: db.user?.status, nameEffect: db.user?.nameEffect, profileEffect: db.user?.profileEffect, badges: db.user?.badges };
   if (id === "system") return SYSTEM;
   const p = (db.people || {})[norm(id)] || (db.people || {})[id];
   if (p) {
     const pr = p.profile || {};
-    return { id: p.name, name: p.name, displayName: pr.displayName, color: pr.color || "#9d6bff", status: (db.online && db.online.has && db.online.has(p.name)) ? (pr.status || "online") : "offline", nameEffect: pr.nameEffect, badges: pr.badges, avatarData: p.avatarData, bannerData: p.bannerData, pronouns: pr.pronouns, customStatus: pr.customStatus, bio: pr.bio, created: p.created };
+    return { id: p.name, name: p.name, displayName: pr.displayName, color: pr.color || "#9d6bff", status: (db.online && db.online.has && db.online.has(p.name)) ? (pr.status || "online") : "offline", nameEffect: pr.nameEffect, profileEffect: pr.profileEffect, badges: pr.badges, avatarData: p.avatarData, bannerData: p.bannerData, pronouns: pr.pronouns, customStatus: pr.customStatus, bio: pr.bio, created: p.created };
   }
   return { id, name: id || "Unknown", color: "#64748b", status: "offline" };
 }
@@ -2072,7 +2107,23 @@ function railHTML() {
       <span class="rail-pill"></span>${I("globe")}</div>
     <div class="rail-sep"></div>
     ${items}
-    <div class="rail-item add" id="railAdd" data-tip="Join or create a server">${I("plus")}</div>`;
+    <div class="rail-item add" id="railAdd" data-tip="Join or create a server">${I("plus")}</div>
+    ${dmAvatarsHTML()}`;
+}
+
+/* your open DMs, as avatar chips in the server rail — click one to jump straight in */
+function dmAvatarsHTML() {
+  if (!db.dms.length) return "";
+  return `<div class="rail-sep"></div>` + db.dms.map(d => {
+    const id = typeof d === "string" ? d : d.id;
+    const m = member(id);
+    const active = db.ui.view === "dms" && db.ui.dmId === id;
+    const unread = db.unreads[`dm:${id}`];
+    return `<div class="rail-item dm-av-chip ${active ? "active" : ""} ${unread ? "unread" : ""}" data-dmrail="${esc(id)}" data-tip="${esc(displayName(m))} — direct messages">
+      <span class="rail-pill"></span>
+      <span class="dm-av-wrap">${avatarHTML(m, "sm")}</span>
+    </div>`;
+  }).join("");
 }
 
 function channelRowHTML(s, cat, ch) {
@@ -2093,8 +2144,8 @@ function sidebarHTML() {
       const m = member(id);
       const active = db.ui.dmId === id;
       return `<div class="dm-row ${active ? "active" : ""}" data-dm="${id}">
-        ${avatarHTML(m, "sm")}
-        <span class="dm-name">${esc(m.name)}</span>
+        <span data-memcard data-memid="${esc(id)}" style="display:grid" title="View profile">${avatarHTML(m, "sm")}</span>
+        <span class="dm-name" data-memcard data-memid="${esc(id)}" title="View profile">${esc(m.name)}</span>
         ${db.unreads[`dm:${id}`] ? `<span class="chan-dot" style="margin-left:auto;width:8px;height:8px;border-radius:50%;background:var(--text)"></span>` : `<button class="dm-x" data-dmclose="${id}" title="Close DM">✕</button>`}
       </div>`;
     }).join("");
@@ -2198,38 +2249,52 @@ function avatarHTML(m, size, cls) {
 }
 
 /* ---------- profile card ---------- */
-function profileCardHTML() {
-  const u = db.user;
+function profileCardHTML(u, isMe) {
+  const av = u.id === "me" ? mediaUrls.avatar : (u.avatarData || null);
+  const banner = u.id === "me" ? mediaUrls.banner : (u.bannerData || null);
+  const statusName = { online: "🟢 Online", idle: "🌙 Idle", dnd: "⛔ Do Not Disturb", offline: "⚫ Offline" }[u.status] || "🟢 Online";
   return `
-    <div class="pc-banner" style="${mediaUrls.banner ? `background-image:url(${mediaUrls.banner})` : `background:${esc(u.color)}33`}" id="pcBanner"></div>
+    <div class="pc-banner" style="${banner ? `background-image:url(${banner})` : `background:${esc(u.color)}33`}" id="pcBanner"></div>
     <div class="pc-body">
-      <span class="pc-av">${avatarHTML(member("me"))}</span>
+      <span class="pc-av">${avatarHTML(u)}</span>
       <div class="pc-name ${NAME_EFFECTS[u.nameEffect]?.cls || ""}">${esc(displayName(u))} ${badgesHTML(u.badges)}</div>
-      <div class="pc-handle">${esc(u.name)} ${u.pronouns ? `• ${esc(u.pronouns)}` : ""}</div>
+      <div class="pc-handle">${esc(u.name)}${u.pronouns ? ` • ${esc(u.pronouns)}` : ""}</div>
       ${u.customStatus ? `<div class="pc-status">${esc(u.customStatus)}</div>` : ""}
       ${u.bio ? `<div class="pc-bio">${esc(u.bio)}</div>` : ""}
       <div class="pc-strip"><span>MEMBER SINCE</span><b>${new Date(u.created || Date.now()).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}</b></div>
+      <div class="pc-strip" style="margin-top:4px"><span>STATUS</span><b>${statusName}</b></div>
       <div class="pc-menu">
-        <button id="pcEdit">✏️ Edit Profile</button>
-        <button data-status="dnd">⛔ Do Not Disturb <span class="chev">›</span></button>
-        <button id="pcSettings">⚙️ My Settings</button>
+        ${isMe
+          ? `<button id="pcEdit">✏️ Edit Profile</button>
+             <button data-status="dnd">⛔ Do Not Disturb <span class="chev">›</span></button>
+             <button id="pcSettings">⚙️ My Settings</button>`
+          : `<button data-pcdm="1">💬 Message</button>`}
       </div>
     </div>`;
 }
 function showProfileCard(anchorEl) {
   const pc = $("#profileCard");
-  pc.innerHTML = profileCardHTML();
+  /* whose profile? data-memid names the member; absent = me (chip / my row) */
+  const who = anchorEl.dataset.memid || "me";
+  const isMe = who === "me" || who === currentUser;
+  const u = isMe ? member("me") : member(who);
+  pc.innerHTML = profileCardHTML(u, isMe);
   pc.classList.remove(...Object.values(PROFILE_EFFECTS).map(v => v.cls).filter(Boolean));
-  const fx = PROFILE_EFFECTS[db.user.profileEffect]?.cls;
+  const fx = PROFILE_EFFECTS[u.profileEffect]?.cls;
   if (fx) pc.classList.add(fx);
   pc.classList.add("show");
   const r = anchorEl.getBoundingClientRect();
   const w = 300, h = pc.offsetHeight || 380;
   pc.style.left = Math.max(8, Math.min(r.left, innerWidth - w - 8)) + "px";
   pc.style.top = Math.max(8, Math.min(r.top - h - 10, innerHeight - h - 8)) + "px";
-  $("#pcEdit").onclick = () => { hideProfileCard(); openSettingsPage("profile"); };
-  $("#pcSettings").onclick = () => { hideProfileCard(); openSettingsPage("account"); };
-  pc.querySelector('[data-status="dnd"]').onclick = () => { db.user.status = "dnd"; persistProfile(); hideProfileCard(); save(); renderSidebar(); renderMembers(); toast("Status: ⛔ Do Not Disturb"); };
+  const edit = pc.querySelector("#pcEdit");
+  if (edit) edit.onclick = () => { hideProfileCard(); openSettingsPage("profile"); };
+  const setBtn = pc.querySelector("#pcSettings");
+  if (setBtn) setBtn.onclick = () => { hideProfileCard(); openSettingsPage("account"); };
+  const dnd = pc.querySelector('[data-status="dnd"]');
+  if (dnd) dnd.onclick = () => { db.user.status = "dnd"; persistProfile(); hideProfileCard(); save(); renderSidebar(); renderMembers(); toast("Status: ⛔ Do Not Disturb"); };
+  const dm = pc.querySelector("[data-pcdm]");
+  if (dm) dm.onclick = () => { hideProfileCard(); if (!db.dms.some(d => (typeof d === "string" ? d : d.id) === u.name)) db.dms.push(u.name); openDM(u.name); };
 }
 function hideProfileCard() { $("#profileCard").classList.remove("show"); }
 
@@ -2237,11 +2302,20 @@ function hideProfileCard() { $("#profileCard").classList.remove("show"); }
 function membersHTML() {
   if (db.ui.view === "dms") return "";
   const s = server(db.ui.serverId);
-  const me = member("me");
-  const stName = { online: "Online", idle: "Idle", dnd: "Do Not Disturb", offline: "Invisible" }[me.status] || "Online";
-  const tag = me.pronouns ? `<span class="mem-tag">${esc(me.pronouns)}</span>` : "";
-  const sRanks = (s.ranks || []).filter(r => (r.members || []).includes("me"));
-  const rankChips = sRanks.map(r => `<span class="rank-chip" style="background:${r.color}22; color:${r.color}"><span class="rank-dot" style="background:${r.color}"></span>${esc(r.name)}</span>`).join(" ");
+  if (!s) return "";
+  const stName = st => ({ online: "Online", idle: "Idle", dnd: "Do Not Disturb", offline: "Offline" }[st] || "Online");
+  const rankChips = name => (s.ranks || []).filter(r => (r.members || []).includes(name))
+    .map(r => `<span class="rank-chip" style="background:${r.color}22; color:${r.color}"><span class="rank-dot" style="background:${r.color}"></span>${esc(r.name)}</span>`).join(" ");
+  const row = name => {
+    const m = member(name);
+    return `<div class="mem carded" data-memcard data-memid="${esc(name)}" title="View profile">${avatarHTML(m, "sm")}
+      <div style="min-width:0">
+        <div class="mem-name">${esc(displayName(m))}${m.pronouns ? `<span class="mem-tag">${esc(m.pronouns)}</span>` : ""}</div>
+        <div class="mem-status-line"><span class="ms-dot ${m.status}"></span>${esc(m.customStatus || stName(m.status))}</div>
+        ${rankChips(name) ? `<div style="margin-top:3px">${rankChips(name)}</div>` : ""}
+      </div>
+    </div>`;
+  };
   const bots = db.bots.filter(bo => bo.inServer === s.id);
   const botRows = bots.map(bo => `
     <div class="mem carded" title="${esc(bo.name)}">
@@ -2251,14 +2325,11 @@ function membersHTML() {
         <div class="mem-status-line"><span class="ms-dot online"></span>${esc(bo.greeting || "Beep boop!")}</div>
       </div>
     </div>`).join("");
-  return `<div class="mem-cat">Owner — 1</div>
-    <div class="mem carded" data-memcard data-memid="me" title="${esc(displayName(me))}">${avatarHTML(me, "sm")}
-      <div style="min-width:0">
-        <div class="mem-name">${esc(displayName(me))}${tag}</div>
-        <div class="mem-status-line"><span class="ms-dot ${me.status}"></span>${esc(me.customStatus || stName)}</div>
-        ${rankChips ? `<div style="margin-top:3px">${rankChips}</div>` : ""}
-      </div>
-    </div>
+  const owner = s.owner && (s.members || []).includes(s.owner) ? s.owner : null;
+  const rest = (s.members || []).filter(n => n !== owner)
+    .sort((a, b) => displayName(member(a)).localeCompare(displayName(member(b))));
+  return `${owner ? `<div class="mem-cat">Owner — 1</div>${row(owner)}` : ""}
+    ${rest.length ? `<div class="mem-cat">Members — ${rest.length}</div>${rest.map(row).join("")}` : ""}
     ${bots.length ? `<div class="mem-cat">Bots — ${bots.length}</div>${botRows}` : ""}`;
 }
 
@@ -2336,9 +2407,9 @@ function msgHTML(m, prev) {
   }
   return `<div class="msg first" data-msg="${m.id}">
     ${tools}
-    <span class="m-av" data-memcard="1" title="View profile">${avatarHTML(a)}</span>
+    <span class="m-av" data-memcard data-memid="${esc(a.id)}" title="View profile">${avatarHTML(a)}</span>
     ${reply}
-    <div class="m-head"><span class="m-name ${NAME_EFFECTS[a.nameEffect]?.cls || ""}" data-memcard="1">${esc(displayName(a))}</span>${a.system ? `<span class="m-sys-tag">System</span>` : ""}${badgesHTML(a.badges, "sm")}<span class="m-time">${fmtTimeDiscord(m.ts)}</span></div>
+    <div class="m-head"><span class="m-name ${NAME_EFFECTS[a.nameEffect]?.cls || ""}" data-memcard data-memid="${esc(a.id)}">${esc(displayName(a))}</span>${a.system ? `<span class="m-sys-tag">System</span>` : ""}${badgesHTML(a.badges, "sm")}<span class="m-time">${fmtTimeDiscord(m.ts)}</span></div>
     <div class="m-text">${md(m.text)}</div>
     ${embedHTML(m)}
     ${reacts ? `<div class="reactions">${reacts}</div>` : ""}
@@ -2752,7 +2823,7 @@ const SET_NAVS = [
   ["notifications", "🔔", "Notifications", ""],
   ["appearance", "🎨", "Appearance", ""],
   ["—", "", "Billing", "cat"],
-  ["astro", "🚀", "Astro", "1 MONTH FREE"],
+  ["astro", "🚀", "Astro", "FREE FOREVER"],
   ["—", "", "Experience", "cat"],
   ["keybinds", "⌨️", "Keybinds", ""],
   ["language", "🌐", "Language", ""],
@@ -2801,8 +2872,7 @@ function renderSettingsPane() {
       <div class="field"><label>Pronouns</label><input type="text" id="stPronouns" value="${esc(u.pronouns || "")}" placeholder="he/him, she/her, they/them…" maxlength="40"></div>
       <div class="field"><label>Custom status</label><input type="text" id="stCustom" value="${esc(u.customStatus || "")}" placeholder="What's happening?" maxlength="80"></div>
       <div class="field"><label>About me</label><textarea id="stBio" maxlength="200" placeholder="A little something about you…">${esc(u.bio || "")}</textarea></div>
-      <div class="field"><label>Display name effect</label><div class="seg" id="stNameFx" style="flex-wrap:wrap">${Object.entries(NAME_EFFECTS).map(([k, v]) => `<button data-k="${k}" class="${(u.nameEffect || "none") === k ? "on" : ""}">${v.name}</button>`).join("")}</div></div>
-      <div class="field"><label>Profile effect</label><div class="seg" id="stProfFx" style="flex-wrap:wrap">${Object.entries(PROFILE_EFFECTS).map(([k, v]) => `<button data-k="${k}" class="${(u.profileEffect || "none") === k ? "on" : ""}">${v.name}</button>`).join("")}</div><div class="f-note">Profile effects animate your profile card — everyone who opens it sees them.</div></div>
+      <div class="field"><label>Display name effect</label><div class="seg" style="flex-wrap:wrap; opacity:.55; pointer-events:none"><span style="padding:6px 10px; color:var(--muted); font-size:13px">Moved to the 🚀 Astro tab — free for everyone.</span></div></div>
       <div class="field"><label>Avatar fallback color</label><div class="swatches" id="stColors">${colors.map(c => `<button data-c="${c}" style="background:${c}" class="${u.color === c ? "on" : ""}"></button>`).join("")}</div></div>
       <div class="field"><label>Your badges</label>
         ${canEditBadges()
@@ -2984,35 +3054,49 @@ function renderSettingsPane() {
     });
   } else if (settingsOpenPane === "astro") {
     const claimed = (u.badges || []).includes("booster");
+    const fxPreview = document.createElement("span");
     pane.innerHTML = `
       ${h("Astro")}
-      <div style="background:linear-gradient(135deg, var(--card), var(--card-2)); border:1px solid var(--border); border-radius:16px; padding:40px 28px; text-align:center">
-        <div style="font-size:56px; margin-bottom:6px">🚀</div>
+      <div style="background:linear-gradient(135deg, var(--card), var(--card-2)); border:1px solid var(--border); border-radius:16px; padding:32px 28px; text-align:center; margin-bottom:22px">
+        <div style="font-size:52px; margin-bottom:4px">🚀</div>
+        <div class="bubbly" style="font-size:30px">Astro — free for everyone</div>
+        <p style="color:var(--muted); margin:10px auto 0; max-width:460px; line-height:1.5">No payments, no trials, no catch. Every effect below is unlocked the moment you claim Astro — which is always free.</p>
         ${claimed
-          ? `<div class="bubbly" style="font-size:30px">Astro claimed!</div>
-             <p style="color:var(--muted); margin:10px auto 0; max-width:420px; line-height:1.5">Astro lets you obtain new features that aren't out yet. You'll get them the moment they ship. 🌟</p>
-             <div style="margin-top:14px">${badgesHTML(["booster"])}</div>`
-          : `<div class="bubbly" style="font-size:34px">Claim Astro</div>
-             <p style="color:var(--muted); margin:12px auto 22px; max-width:420px; line-height:1.5">One click. No payment. Ever.</p>
-             <button class="astro-claim-btn" id="astroClaim">Claim Astro</button>`}
-      </div>`;
+          ? `<div style="margin-top:14px">${badgesHTML(["booster"])} <span style="font-size:12.5px; color:var(--accent-2); font-weight:700; margin-left:8px">Claimed ✓</span></div>`
+          : `<button class="astro-claim-btn" id="astroClaim" style="margin-top:18px; font-size:18px; padding:12px 36px">Claim Astro — Free</button>`}
+      </div>
+      <h2 class="set-h2">Display name effects</h2>
+      <p class="f-note" style="margin-bottom:10px">These animate your name everywhere it shows — chat, member lists, DMs.</p>
+      <div class="seg" id="astNameFx" style="flex-wrap:wrap">${Object.entries(NAME_EFFECTS).map(([k, v]) => `<button data-k="${k}" class="${(u.nameEffect || "none") === k ? "on" : ""}">${v.name}</button>`).join("")}</div>
+      <h2 class="set-h2" style="margin-top:24px">Profile effects</h2>
+      <p class="f-note" style="margin-bottom:10px">Animate your profile card — everyone who opens your profile sees them.</p>
+      <div class="seg" id="astProfFx" style="flex-wrap:wrap">${Object.entries(PROFILE_EFFECTS).map(([k, v]) => `<button data-k="${k}" class="${(u.profileEffect || "none") === k ? "on" : ""}">${v.name}</button>`).join("")}</div>
+      <div class="mo-foot" style="padding:24px 0"><button class="btn primary" id="astSave">Save Effects</button></div>`;
     const claim = pane.querySelector("#astroClaim");
     if (claim) claim.onclick = () => {
-      openModal(`
-        <div class="mo-head"><div style="font-size:52px">🚀</div><h2 style="margin-top:6px">Astro</h2><p style="font-size:15px; margin-top:10px">Astro lets you obtain new features that aren't out yet</p></div>
-        <div class="mo-body" style="align-items:center; text-align:center">
-          <div class="bubbly" style="font-size:26px">Claim Astro</div>
-          <button class="astro-claim-btn" id="astroConfirm">Claim</button>
-          <p style="color:var(--faint); font-size:12px">Free forever · no account charge · no catch</p>
-        </div>`);
-      $("#astroConfirm").onclick = () => {
-        if (!(u.badges || []).includes("booster")) u.badges = [...(u.badges || ["member"]), "booster"];
-        persistProfile();
-        closeModal();
-        renderSettingsPane();
-        renderAll();
-        toast("Astro claimed! 🚀 Check your badges");
-      };
+      if (!(u.badges || []).includes("booster")) u.badges = [...(u.badges || ["member"]), "booster"];
+      persistProfile();
+      renderSettingsPane();
+      renderAll();
+      toast("Astro claimed! 🚀 Effects unlocked — they were always free");
+    };
+    const nameSeg = pane.querySelector("#astNameFx");
+    const profSeg = pane.querySelector("#astProfFx");
+    nameSeg.addEventListener("click", e => {
+      const b = e.target.closest("button"); if (!b) return;
+      u.nameEffect = b.dataset.k;
+      [...nameSeg.children].forEach(x => x.classList.toggle("on", x === b));
+      renderAll();
+    });
+    profSeg.addEventListener("click", e => {
+      const b = e.target.closest("button"); if (!b) return;
+      u.profileEffect = b.dataset.k;
+      [...profSeg.children].forEach(x => x.classList.toggle("on", x === b));
+    });
+    pane.querySelector("#astSave").onclick = () => {
+      persistProfile();
+      save(); renderAll();
+      toast("✨ Effects saved");
     };
   } else if (settingsOpenPane === "keybinds") {
     pane.innerHTML = `
@@ -3060,17 +3144,6 @@ function wireProfileEditor(pane, u) {
     if (!badges.length) badges = ["member"];
     b.innerHTML = `${BADGES[k].ico} ${BADGES[k].name}${badges.includes(k) ? " ✓" : ""}`;
     paint();
-  });
-  pane.querySelector("#stNameFx").addEventListener("click", e => {
-    const b = e.target.closest("button"); if (!b) return;
-    nameFx = b.dataset.k;
-    [...b.parentElement.children].forEach(x => x.classList.toggle("on", x === b));
-    paint();
-  });
-  pane.querySelector("#stProfFx").addEventListener("click", e => {
-    const b = e.target.closest("button"); if (!b) return;
-    profFx = b.dataset.k;
-    [...b.parentElement.children].forEach(x => x.classList.toggle("on", x === b));
   });
   const colors = [...pane.querySelectorAll("#stColors button")];
   let color = u.color;
@@ -3867,6 +3940,8 @@ $("#rail").addEventListener("click", e => {
     const first = s.categories.flatMap(c => c.channels).find(c => c.type === "text");
     if (first) openChannel(s.id, first.id);
   }
+  const dmChip = e.target.closest("[data-dmrail]");
+  if (dmChip) return openDM(dmChip.dataset.dmrail);
 });
 
 $("#sidebar").addEventListener("click", e => {
@@ -3878,6 +3953,8 @@ $("#sidebar").addEventListener("click", e => {
   }
   const friends = e.target.closest("#btnFriends");
   if (friends) return openHome();
+  const dmRow = e.target.closest(".dm-row[data-dm]");
+  if (dmRow && !e.target.closest("[data-memcard]")) return openDM(dmRow.dataset.dm);
   const serverMenu = e.target.closest("[data-servermenu]");
   if (serverMenu) {
     const r = serverMenu.getBoundingClientRect();

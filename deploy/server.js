@@ -290,7 +290,7 @@ async function handle(req, res) {
     if (body.email && Object.values(db.users).some(u => u.email === body.email.toLowerCase())) return send(400, { error: "That email is already on an account." });
     db.users[name] = {
       name, pass: hashPass(body.pass), email: body.email ? body.email.toLowerCase() : null, emailVerified: false,
-      profile: { name, displayName: "", color: "#9d6bff", status: "online", pronouns: "", customStatus: "", bio: "", nameEffect: "none", profileEffect: "none", badges: ["member"] },
+      profile: { name, displayName: "", color: "#9d6bff", status: "online", pronouns: "", customStatus: "", bio: "", nameEffect: "none", profileEffect: "none", badges: ["member", "booster"] },
       created: Date.now(),
     };
     const token = crypto.randomBytes(24).toString("hex");
