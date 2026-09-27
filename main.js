@@ -2,6 +2,8 @@
 
 const { app, BrowserWindow, ipcMain, shell, Notification, desktopCapturer, dialog } = require("electron");
 const path = require("path");
+const fs = require("fs");
+const https = require("https");
 
 /* Disglobe app — the whole program lives in disglobe.html + server.js. */
 const DISGLOBE = true;
@@ -158,6 +160,49 @@ function resolveServerUrl() {
 }
 const REMOTE_URL = resolveServerUrl();
 
+/* ---- in-app updater ----
+   Checks GitHub releases for a newer build, downloads the zip, then swaps the
+   running portable exe via a detached batch file on quit (a running exe can be
+   renamed but not overwritten, so the .bat waits for us to exit). */
+const UPDATE_REPO = "t4hf/disglobe";
+function ghApi(p) {
+  return new Promise((resolve, reject) => {
+    https.get({ host: "api.github.com", path: p, headers: { "User-Agent": "Disglobe", "Accept": "application/vnd.github+json" } }, res => {
+      let b = ""; res.on("data", c => b += c);
+      res.on("end", () => { try { resolve(JSON.parse(b)); } catch (e) { reject(e); } });
+    }).on("error", reject);
+  });
+}
+function downloadFile(url, dest, onProgress) {
+  return new Promise((resolve, reject) => {
+    const get = u => {
+      https.get(u, { headers: { "User-Agent": "Disglobe" } }, res => {
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) return get(res.headers.location);
+        if (res.statusCode !== 200) return reject(new Error("HTTP " + res.statusCode));
+        const total = Number(res.headers["content-length"]) || 0;
+        let got = 0, lastPct = -1;
+        const f = fs.createWriteStream(dest);
+        res.on("data", c => {
+          got += c.length;
+          if (total && onProgress) {
+            const pct = Math.round(got / total * 100);
+            if (pct !== lastPct) { lastPct = pct; onProgress(got, total, pct); }
+          }
+        });
+        res.pipe(f);
+        f.on("finish", () => f.close(() => resolve(dest)));
+        f.on("error", reject);
+      }).on("error", reject);
+    };
+    get(url);
+  });
+}
+function pushUpdateProgress(pct) {
+  for (const w of BrowserWindow.getAllWindows()) {
+    try { w.webContents.send("disglobe:update-progress", pct); } catch {}
+  }
+}
+
 app.whenReady().then(() => {
   /* Show the cosmic splash immediately, before any main-window work begins. */
   createSplash();
@@ -166,6 +211,54 @@ app.whenReady().then(() => {
   ipcMain.on("disglobe:lan-ip", (e) => { e.returnValue = global.__disglobeLanIp || "localhost"; });
   /* client asks which server to use (remote cloud URL or embedded local) */
   ipcMain.on("disglobe:server-url", (e) => { e.returnValue = REMOTE_URL; });
+  /* ---- updater bridges ---- */
+  ipcMain.on("disglobe:app-version", (e) => { e.returnValue = app.getVersion(); });
+  ipcMain.handle("disglobe:update-check", async () => {
+    try {
+      const rel = await ghApi(`/repos/${UPDATE_REPO}/releases/latest`);
+      if (rel.message) return { error: rel.message };
+      const latest = String(rel.tag_name || "").replace(/^v/, "");
+      const asset = (rel.assets || []).find(a => a.name === `Disglobe-${latest}-online.zip`) || (rel.assets || [])[0];
+      return { current: app.getVersion(), latest, name: rel.name || "", notes: rel.body || "", url: asset ? asset.browser_download_url : null, size: asset ? asset.size : 0 };
+    } catch (e) { return { error: String(e.message || e) }; }
+  });
+  let updateZipPath = null;
+  ipcMain.handle("disglobe:update-download", async () => {
+    try {
+      const chk = await ghApi(`/repos/${UPDATE_REPO}/releases/latest`);
+      const latest = String(chk.tag_name || "").replace(/^v/, "");
+      const asset = (chk.assets || []).find(a => a.name === `Disglobe-${latest}-online.zip`) || (chk.assets || [])[0];
+      if (!asset) return { error: "No release asset found." };
+      updateZipPath = path.join(app.getPath("temp"), `disglobe-${latest}-update.zip`);
+      await downloadFile(asset.browser_download_url, updateZipPath, (got, total, pct) => pushUpdateProgress(pct));
+      return { ok: true, zipPath: updateZipPath, size: asset.size };
+    } catch (e) { return { error: String(e.message || e) }; }
+  });
+  ipcMain.handle("disglobe:update-apply", async () => {
+    try {
+      if (!updateZipPath || !fs.existsSync(updateZipPath)) return { error: "No downloaded update found — download first." };
+      const exePath = process.execPath;
+      const work = path.join(app.getPath("temp"), "disglobe-update");
+      const bat = [
+        "@echo off",
+        "timeout /t 2 /nobreak >nul",
+        `if exist "${work}" rmdir /s /q "${work}"`,
+        `powershell -NoProfile -Command "Expand-Archive -Force '${updateZipPath.replace(/'/g, "''")}' '${work}'"`,
+        `move /y "${exePath}" "${exePath}.old"`,
+        `for %%f in ("${work}\\Disglobe *.exe") do move /y "%%f" "${exePath}"`,
+        `start "" "${exePath}"`,
+        `if exist "${exePath}.old" del /q "${exePath}.old"`,
+        `if exist "${work}" rmdir /s /q "${work}"`,
+      ].join("\r\n");
+      const batPath = path.join(app.getPath("temp"), "disglobe-update.bat");
+      fs.writeFileSync(batPath, bat);
+      const { spawn } = require("child_process");
+      const child = spawn("cmd", ["/c", batPath], { detached: true, stdio: "ignore", windowsHide: true });
+      child.unref();
+      setTimeout(() => app.quit(), 300);
+      return { ok: true };
+    } catch (e) { return { error: String(e.message || e) }; }
+  });
   /* screenshare: Electron needs desktopCapturer (no native getDisplayMedia picker in the exe) */
   ipcMain.handle("disglobe:screen-sources", async () => {
     try {

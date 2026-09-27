@@ -16,3 +16,15 @@ contextBridge.exposeInMainWorld("disglobeLanIp", () =>
 /* the server URL baked into this build (cloud mode) or null (self-host mode) */
 contextBridge.exposeInMainWorld("disglobeServerUrl", () =>
   ipcRenderer.sendSync("disglobe:server-url"));
+/* in-app updater: version, check GitHub releases, download, apply & restart */
+contextBridge.exposeInMainWorld("disglobeAppVersion", () =>
+  ipcRenderer.sendSync("disglobe:app-version"));
+contextBridge.exposeInMainWorld("disglobeUpdateCheck", () =>
+  ipcRenderer.invoke("disglobe:update-check"));
+contextBridge.exposeInMainWorld("disglobeUpdateDownload", () =>
+  ipcRenderer.invoke("disglobe:update-download"));
+contextBridge.exposeInMainWorld("disglobeUpdateApply", () =>
+  ipcRenderer.invoke("disglobe:update-apply"));
+contextBridge.exposeInMainWorld("disglobeUpdateProgress", (cb) => {
+  ipcRenderer.on("disglobe:update-progress", (_e, pct) => cb(pct));
+});

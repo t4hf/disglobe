@@ -363,6 +363,20 @@
     50%      { border-color: var(--accent); box-shadow: 0 0 16px rgba(45,212,168,.5); }
   }
 
+  /* character frames (Astro) — inspired by classic cartoon palettes */
+  .av-frame-mouse  { box-shadow: 0 0 0 2.5px #1b1b1b, 0 0 0 5.5px #e8402a, 0 0 12px rgba(232,64,42,.35); }
+  .av-frame-rabbit { box-shadow: 0 0 0 2.5px #b9bec7, 0 0 0 5.5px #f28c28, 0 0 10px rgba(242,140,40,.3); }
+  .av-frame-sponge { box-shadow: 0 0 0 3px #ffe135, 0 0 0 6.5px #a0713c, 0 0 14px rgba(255,225,53,.45); }
+  .av-frame-sailor { box-shadow: 0 0 0 2.5px #1f3a93, 0 0 0 5.5px #d32f2f, 0 0 10px rgba(31,58,147,.35); }
+  .av-frame-snow   { box-shadow: 0 0 0 2.5px #37c5d6, 0 0 0 5.5px #e33333, 0 0 10px rgba(55,197,214,.35); }
+  .av-frame-donut  { box-shadow: 0 0 0 2.5px #ffd90f, 0 0 0 5.5px #4aa5df, 0 0 12px rgba(255,105,180,.4); }
+  .pc-frame-mouse  { border: 2px solid #e8402a; box-shadow: inset 0 0 0 2px #1b1b1b; }
+  .pc-frame-rabbit { border: 2px solid #f28c28; box-shadow: inset 0 0 0 2px #b9bec7; }
+  .pc-frame-sponge { border: 2px solid #ffe135; box-shadow: inset 0 0 0 2px #a0713c; }
+  .pc-frame-sailor { border: 2px solid #1f3a93; box-shadow: inset 0 0 0 2px #d32f2f; }
+  .pc-frame-snow   { border: 2px solid #37c5d6; box-shadow: inset 0 0 0 2px #e33333; }
+  .pc-frame-donut  { border: 2px solid #ffd90f; box-shadow: inset 0 0 0 2px #4aa5df; }
+
   /* profile card */
   #profileCard { position: fixed; display: none; width: 300px; background: var(--rail); border-radius: 14px; z-index: 420; box-shadow: 0 18px 60px rgba(0,0,0,.7); overflow: hidden; border: 1px solid var(--border); }
   #profileCard.show { display: block; }
@@ -404,6 +418,22 @@
     -webkit-mask-composite: xor; mask-composite: exclude;
     animation: spinAng 4s linear infinite;
   }
+
+  /* ---- shop (everything free) ---- */
+  .shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 10px; }
+  .shop-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px 10px 12px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .shop-card.equipped { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .shop-prev {
+    width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center;
+    background: linear-gradient(135deg, #9d6bff, #5865f2); color: #fff; font-weight: 800; font-size: 16px;
+    flex: none;
+  }
+  .shop-prev.pc-prev { width: 100%; height: 34px; border-radius: 9px; background: var(--rail); }
+  .shop-name { font-size: 12.5px; font-weight: 700; line-height: 1.25; }
+  .shop-price { font-size: 10px; font-weight: 800; letter-spacing: .6px; color: #3ddc84; background: rgba(35,165,90,.14); border: 1px solid rgba(35,165,90,.4); padding: 2px 8px; border-radius: 20px; text-transform: uppercase; }
+  .shop-equip { width: 100%; padding: 6px 0; border-radius: 7px; font-size: 12px; font-weight: 700; background: var(--accent); color: #fff; }
+  .shop-equip:hover { filter: brightness(1.1); }
+  .shop-equip.on { background: var(--hover); color: var(--accent-2); }
 
   /* settings previews */
   .set-banner { height: 90px; border-radius: 10px; background-size: cover; background-position: center; border: 1px solid var(--border); }
@@ -1253,6 +1283,15 @@ function handleLive(m) {
       renderMain();
     } else {
       markUnread(m.key);
+    }
+    /* new DM partner? surface their avatar chip in the rail immediately —
+       don't wait for the next world refresh */
+    if (m.key.startsWith("dm:")) {
+      const who = m.key.slice(3).split("|").find(n => n !== currentUser);
+      if (who && !db.dms.some(d => (typeof d === "string" ? d : d.id) === who)) {
+        db.dms.push(who);
+        if (db.ui.view === "dms") renderSidebar();
+      }
     }
     if (isNew && document.hidden) notifyNewMessage(m.key, m.msg);
     else if (isNew && np().sound && m.msg.uid !== currentUser) notifSound();
@@ -2647,6 +2686,12 @@ const AVATAR_FRAMES = {
   galaxy:  { name: "🌌 Galaxy", cls: "av-frame-galaxy" },
   spin:    { name: "🌀 Spin", cls: "av-frame-spin" },
   pulse:   { name: "💚 Pulse", cls: "av-frame-pulse" },
+  mouse:   { name: "🐭 Mr. Mouse", cls: "av-frame-mouse" },
+  rabbit:  { name: "🐰 Wasco Rabbit", cls: "av-frame-rabbit" },
+  sponge:  { name: "🧽 Sea Sponge", cls: "av-frame-sponge" },
+  sailor:  { name: "⚓ Old Sailor", cls: "av-frame-sailor" },
+  snow:    { name: "⛄ Snow Kid", cls: "av-frame-snow" },
+  donut:   { name: "🍩 Donut Dad", cls: "av-frame-donut" },
 };
 const PROFILE_CARD_FRAMES = {
   none:    { name: "None", cls: "" },
@@ -2658,6 +2703,12 @@ const PROFILE_CARD_FRAMES = {
   galaxy:  { name: "🌌 Galaxy", cls: "pc-frame-galaxy" },
   spin:    { name: "🌀 Spin", cls: "pc-frame-spin" },
   pulse:   { name: "💚 Pulse", cls: "pc-frame-pulse" },
+  mouse:   { name: "🐭 Mr. Mouse", cls: "pc-frame-mouse" },
+  rabbit:  { name: "🐰 Wasco Rabbit", cls: "pc-frame-rabbit" },
+  sponge:  { name: "🧽 Sea Sponge", cls: "pc-frame-sponge" },
+  sailor:  { name: "⚓ Old Sailor", cls: "pc-frame-sailor" },
+  snow:    { name: "⛄ Snow Kid", cls: "pc-frame-snow" },
+  donut:   { name: "🍩 Donut Dad", cls: "pc-frame-donut" },
 };
 const AV_FRAME_KEY = "avatarFrame";
 const PC_FRAME_KEY = "profileFrame";
@@ -3115,9 +3166,11 @@ const SET_NAVS = [
   ["appearance", "🎨", "Appearance", ""],
   ["—", "", "Billing", "cat"],
   ["astro", "🚀", "Astro", "FREE FOREVER"],
+  ["shop", "🛍️", "Shop", "FREE"],
   ["—", "", "Experience", "cat"],
   ["keybinds", "⌨️", "Keybinds", ""],
   ["language", "🌐", "Language", ""],
+  ["updates", "⬇️", "Updates", ""],
   ["—", "", "Danger Zone", "cat"],
   ["reset", "⚠️", "Reset Data", ""],
 ];
@@ -3407,6 +3460,68 @@ function renderSettingsPane() {
       save(); renderAll();
       toast("✨ Effects saved");
     };
+  } else if (settingsOpenPane === "shop") {
+    /* the Disglobe shop — everything free, always. Equip any frame or effect. */
+    const cardFor = (key, item, kind, equippedKey) => {
+      const equipped = equippedKey === key;
+      const prev = kind === "av"
+        ? `<span class="shop-prev ${item.cls}">${initials(displayName(u))}</span>`
+        : `<span class="shop-prev pc-prev ${item.cls}"></span>`;
+      return `<div class="shop-card ${equipped ? "equipped" : ""}" data-shopkind="${kind}" data-shopkey="${key}">
+        ${prev}
+        <div class="shop-name">${item.name}</div>
+        <span class="shop-price">FREE</span>
+        <button class="shop-equip ${equipped ? "on" : ""}">${equipped ? "✓ Equipped" : "Equip"}</button>
+      </div>`;
+    };
+    const avGrid = Object.entries(AVATAR_FRAMES).map(([k, v]) => cardFor(k, v, "av", u.avatarFrame || "none")).join("");
+    const pcGrid = Object.entries(PROFILE_CARD_FRAMES).map(([k, v]) => cardFor(k, v, "pc", u.profileFrame || "none")).join("");
+    const nmGrid = Object.entries(NAME_EFFECTS).map(([k, v]) => `<div class="shop-card ${(u.nameEffect || "none") === k ? "equipped" : ""}" data-shopkind="nm" data-shopkey="${k}">
+        <span class="shop-prev ${v.cls}">${initials(displayName(u))}</span>
+        <div class="shop-name">${v.name}</div>
+        <span class="shop-price">FREE</span>
+        <button class="shop-equip ${(u.nameEffect || "none") === k ? "on" : ""}">${(u.nameEffect || "none") === k ? "✓ Equipped" : "Equip"}</button>
+      </div>`).join("");
+    const pfGrid = Object.entries(PROFILE_EFFECTS).map(([k, v]) => `<div class="shop-card ${(u.profileEffect || "none") === k ? "equipped" : ""}" data-shopkind="pf" data-shopkey="${k}">
+        <span class="shop-prev pc-prev ${v.cls}" style="min-height:34px">Profile</span>
+        <div class="shop-name">${v.name}</div>
+        <span class="shop-price">FREE</span>
+        <button class="shop-equip ${(u.profileEffect || "none") === k ? "on" : ""}">${(u.profileEffect || "none") === k ? "✓ Equipped" : "Equip"}</button>
+      </div>`).join("");
+    pane.innerHTML = `
+      ${h("Shop")}
+      <div style="background:linear-gradient(135deg, rgba(157,107,255,.14), rgba(88,101,242,.1)); border:1px solid var(--border); border-radius:14px; padding:18px 22px; margin-bottom:20px; display:flex; align-items:center; gap:14px">
+        <div style="font-size:34px">🛍️</div>
+        <div>
+          <div style="font-weight:800; font-size:16px">Everything in here is free. Forever.</div>
+          <div style="color:var(--muted); font-size:13px; margin-top:2px">No currency, no grinding, no catch. Click equip and it's yours.</div>
+        </div>
+      </div>
+      <h2 class="set-h2">Avatar frames</h2>
+      <p class="f-note" style="margin-bottom:10px">Rings around your profile picture everywhere it shows.</p>
+      <div class="shop-grid" id="shopAv">${avGrid}</div>
+      <h2 class="set-h2" style="margin-top:22px">Profile card frames</h2>
+      <p class="f-note" style="margin-bottom:10px">Borders around your profile card when someone opens your profile.</p>
+      <div class="shop-grid" id="shopPc">${pcGrid}</div>
+      <h2 class="set-h2" style="margin-top:22px">Name effects</h2>
+      <p class="f-note" style="margin-bottom:10px">Animated flair on your display name in chat, member lists and DMs.</p>
+      <div class="shop-grid" id="shopNm">${nmGrid}</div>
+      <h2 class="set-h2" style="margin-top:22px">Profile effects</h2>
+      <p class="f-note" style="margin-bottom:10px">Animations inside your profile card.</p>
+      <div class="shop-grid" id="shopPf">${pfGrid}</div>`;
+    pane.addEventListener("click", function shopClick(e) {
+      const card = e.target.closest(".shop-card");
+      if (!card) return;
+      const kind = card.dataset.shopkind, key = card.dataset.shopkey;
+      if (kind === "av") u.avatarFrame = key;
+      else if (kind === "pc") u.profileFrame = key;
+      else if (kind === "nm") u.nameEffect = key;
+      else if (kind === "pf") u.profileEffect = key;
+      persistProfile();
+      save(); renderAll();
+      renderSettingsPane();
+      toast("✨ Equipped — it's free!");
+    }, { once: false });
   } else if (settingsOpenPane === "keybinds") {
     pane.innerHTML = `
       ${h("Keybinds")}
@@ -3418,6 +3533,80 @@ function renderSettingsPane() {
     pane.innerHTML = `
       ${h("Language")}
       <div class="set-row2"><div class="rl">Display language</div><div class="seg" style="width:260px"><button class="on">English (US)</button><button>More soon…</button></div></div>`;
+  } else if (settingsOpenPane === "updates") {
+    const inExe = typeof disglobeAppVersion === "function";
+    if (!inExe) {
+      pane.innerHTML = `
+        ${h("Updates")}
+        <div style="background:var(--card); border:1px solid var(--border); border-radius:12px; padding:24px; text-align:center">
+          <div style="font-size:44px; margin-bottom:8px">🌐</div>
+          <p style="color:var(--muted); max-width:420px; margin:0 auto; line-height:1.5">You're on the web version — it's always up to date, since the browser loads the latest client from the server on every refresh.</p>
+        </div>`;
+    } else {
+      const myVer = disglobeAppVersion();
+      pane.innerHTML = `
+        ${h("Updates")}
+        <div style="background:var(--card); border:1px solid var(--border); border-radius:12px; padding:24px; margin-bottom:14px">
+          <div style="display:flex; align-items:center; gap:14px">
+            <div style="font-size:40px">🚀</div>
+            <div style="flex:1">
+              <div style="font-weight:800; font-size:16px">Disglobe v${esc(myVer)}</div>
+              <div id="updStatus" style="color:var(--muted); font-size:13px; margin-top:2px">Checking for updates…</div>
+            </div>
+            <div id="updBarWrap" style="display:none; flex:1; max-width:220px">
+              <div style="height:8px; background:var(--hover); border-radius:4px; overflow:hidden"><div id="updBar" style="height:100%; width:0%; background:var(--accent); border-radius:4px; transition:width .2s"></div></div>
+              <div id="updPct" style="font-size:11px; color:var(--muted); margin-top:4px; text-align:center">0%</div>
+            </div>
+          </div>
+          <div id="updNotes" style="display:none; margin-top:14px; padding-top:14px; border-top:1px solid var(--border); color:var(--muted); font-size:13px; line-height:1.55; white-space:pre-wrap; max-height:180px; overflow-y:auto"></div>
+          <div style="margin-top:16px; display:flex; gap:10px">
+            <button class="btn primary" id="updAction" style="display:none"></button>
+            <button class="btn" id="updRecheck">Check Again</button>
+          </div>
+        </div>
+        <p class="f-note">Updates come straight from the official GitHub releases. Downloading happens in the background — when you hit <b>Install &amp; Restart</b>, Disglobe applies the update and relaunches itself. Your account and messages are stored in the cloud, so nothing is lost.</p>`;
+      const status = pane.querySelector("#updStatus");
+      const notes = pane.querySelector("#updNotes");
+      const action = pane.querySelector("#updAction");
+      const barWrap = pane.querySelector("#updBarWrap");
+      const bar = pane.querySelector("#updBar");
+      const pct = pane.querySelector("#updPct");
+      let latestVer = null;
+      const cmpVer = (a, b) => { const p = String(a).split(".").map(Number), q = String(b).split(".").map(Number); for (let i = 0; i < 3; i++) if ((p[i] || 0) !== (q[i] || 0)) return (p[i] || 0) < (q[i] || 0) ? -1 : 1; return 0; };
+      const check = async () => {
+        status.textContent = "Checking for updates…";
+        action.style.display = "none";
+        notes.style.display = "none";
+        const r = await disglobeUpdateCheck();
+        if (r.error) { status.textContent = "⚠️ Couldn't check: " + r.error; return; }
+        latestVer = r.latest;
+        if (cmpVer(r.latest, r.current) <= 0) {
+          status.innerHTML = `✅ You're on the latest version (v${esc(r.current)})`;
+          return;
+        }
+        status.innerHTML = `🎉 <b style="color:var(--accent-2)">v${esc(r.latest)}</b> is available — you have v${esc(r.current)}`;
+        if (r.notes) { notes.textContent = r.notes; notes.style.display = "block"; }
+        action.textContent = "⬇️ Download v" + r.latest;
+        action.style.display = "";
+        action.onclick = async () => {
+          action.disabled = true; action.textContent = "Downloading…";
+          barWrap.style.display = "";
+          const dl = await disglobeUpdateDownload();
+          if (dl.error) { action.disabled = false; action.textContent = "⬇️ Retry Download"; status.textContent = "⚠️ " + dl.error; return; }
+          bar.style.width = "100%"; pct.textContent = "100%";
+          action.disabled = false;
+          action.textContent = "🔄 Install & Restart";
+          action.onclick = async () => {
+            action.disabled = true; action.textContent = "Restarting…";
+            const ap = await disglobeUpdateApply();
+            if (ap.error) { action.disabled = false; action.textContent = "🔄 Install & Restart"; status.textContent = "⚠️ " + ap.error; }
+          };
+        };
+      };
+      if (typeof disglobeUpdateProgress === "function") disglobeUpdateProgress(p => { bar.style.width = p + "%"; pct.textContent = p + "%"; });
+      check();
+      pane.querySelector("#updRecheck").onclick = check;
+    }
   } else if (settingsOpenPane === "reset") {
     pane.innerHTML = `
       ${h("Reset Data")}
