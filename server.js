@@ -216,7 +216,12 @@ function wsConnect(name, ws) {
   if (wasOffline) broadcastPresence();
   ws.on("close", () => {
     const set = wsClients.get(n);
-    if (set) { set.delete(ws); if (!set.size) { wsClients.delete(n); onlineUsers.delete(n); broadcastPresence(); } }
+    if (set) { set.delete(ws); if (!set.size) {
+      wsClients.delete(n); onlineUsers.delete(n);
+      /* drop their voice + speaking state so channels don't show ghosts */
+      if (voiceStates[n] || speakingStates[n]) { delete voiceStates[n]; delete speakingStates[n]; voiceBroadcast(); }
+      broadcastPresence();
+    } }
   });
 }
 function broadcastPresence() {
@@ -228,9 +233,13 @@ function broadcastPresence() {
    voiceStates: name -> { serverId, channelId, sharing:"screen"|"cam"|null, quality }
    rtc signals relay between two peers by username (WebRTC mesh, direct P2P). */
 const voiceStates = {};
+/* speakingStates: name -> true while their mic picks up sound (for green speaking rings) */
+const speakingStates = {};
 function voiceBroadcast() {
   const event = JSON.stringify({ type: "voice", states: voiceStates });
   for (const set of wsClients.values()) for (const ws of set) { try { if (ws.readyState === 1) ws.send(event); } catch {} }
+  const speakingEvent = JSON.stringify({ type: "speaking", states: speakingStates });
+  for (const set of wsClients.values()) for (const ws of set) { try { if (ws.readyState === 1) ws.send(speakingEvent); } catch {} }
 }
 function sendToUser(user, obj) { sendTo(user, obj); }
 
@@ -352,7 +361,7 @@ async function handle(req, res) {
   if (p === "/api/world") return send(200, worldFor(me));
   if (p === "/api/me" && req.method === "POST") {
     const u = db.users[me];
-    const allowed = ["displayName", "pronouns", "customStatus", "bio", "color", "status", "nameEffect", "profileEffect", "badges"];
+    const allowed = ["displayName", "pronouns", "customStatus", "bio", "color", "status", "nameEffect", "profileEffect", "badges", "avatarFrame", "profileFrame"];
     for (const k of allowed) if (k in body) u.profile[k] = body[k];
     if (body.avatarData && String(body.avatarData).length < 2 * 1024 * 1024) u.avatarData = body.avatarData;
     if (body.bannerData && String(body.bannerData).length < 3 * 1024 * 1024) u.bannerData = body.bannerData;
@@ -584,6 +593,7 @@ async function handle(req, res) {
   if (p === "/api/voice/state" && req.method === "POST") {
     if (body.leave) {
       delete voiceStates[me];
+      delete speakingStates[me];
     } else {
       voiceStates[me] = {
         serverId: String(body.serverId || ""), channelId: String(body.channelId || ""),
@@ -594,6 +604,12 @@ async function handle(req, res) {
     }
     voiceBroadcast();
     return send(200, { ok: true, states: voiceStates });
+  }
+  if (p === "/api/voice/speaking" && req.method === "POST") {
+    if (voiceStates[me] && body.speaking) speakingStates[me] = Date.now();
+    else delete speakingStates[me];
+    voiceBroadcast();
+    return send(200, { ok: true });
   }
   if (p === "/api/rtc/signal" && req.method === "POST") {
     const to = norm(body.to);

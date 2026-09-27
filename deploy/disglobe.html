@@ -266,6 +266,72 @@
   .mini-av img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
   .av .av-img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; position: absolute; inset: 0; }
 
+  /* speaking indicators: green ring while someone's mic picks up sound */
+  .speaking .av, .speaking .mini-av, .av.speaking, .mini-av.speaking {
+    box-shadow: 0 0 0 3px var(--accent), 0 0 12px rgba(45,212,168,.55);
+  }
+  .mem.vrow.speaking { background: rgba(45,212,168,.07); border-radius: 8px; }
+
+  /* avatar frames (Astro) */
+  .av-frame-gold    { box-shadow: 0 0 0 2.5px #f5c542, 0 0 12px rgba(245,197,66,.4); }
+  .av-frame-neon    { box-shadow: 0 0 0 2.5px #a855f7, 0 0 14px rgba(168,85,247,.4); }
+  .av-frame-fire    { box-shadow: 0 0 0 2.5px #ff7a18, 0 0 14px rgba(255,61,0,.5); }
+  .av-frame-ice     { box-shadow: 0 0 0 2.5px #7fd8ff, 0 0 14px rgba(127,216,255,.45); }
+  .av-frame-rainbow { animation: frameRainbow 5s linear infinite; }
+  .av-frame-galaxy  {
+    border: 2.5px solid transparent;
+    background: linear-gradient(var(--chat), var(--chat)) padding-box,
+                linear-gradient(135deg, #a855f7, #38bdf8, #f5c542) border-box;
+  }
+  @keyframes frameRainbow {
+    0%   { box-shadow: 0 0 0 2.5px #ff5f5f, 0 0 12px rgba(255,95,95,.4); }
+    25%  { box-shadow: 0 0 0 2.5px #ffd85f, 0 0 12px rgba(255,216,95,.4); }
+    50%  { box-shadow: 0 0 0 2.5px #5fff8f, 0 0 12px rgba(95,255,143,.4); }
+    75%  { box-shadow: 0 0 0 2.5px #5fb0ff, 0 0 12px rgba(95,176,255,.4); }
+    100% { box-shadow: 0 0 0 2.5px #d05fff, 0 0 12px rgba(208,95,255,.4); }
+  }
+
+  /* profile card frames (Astro) */
+  .pc-frame-gold    { border: 2px solid #f5c542; }
+  .pc-frame-neon    { border: 2px solid #a855f7; }
+  .pc-frame-fire    { border: 2px solid #ff7a18; }
+  .pc-frame-ice     { border: 2px solid #7fd8ff; }
+  .pc-frame-rainbow { animation: pcRainbow 5s linear infinite; }
+  .pc-frame-galaxy  {
+    border: 2px solid transparent;
+    background: linear-gradient(var(--rail), var(--rail)) padding-box,
+                linear-gradient(135deg, #a855f7, #38bdf8, #f5c542) border-box;
+  }
+  @keyframes pcRainbow {
+    0%   { border-color: #ff5f5f; }
+    25%  { border-color: #ffd85f; }
+    50%  { border-color: #5fff8f; }
+    75%  { border-color: #5fb0ff; }
+    100% { border-color: #d05fff; }
+  }
+
+  /* animated frames (Astro) — @property lets conic-gradient angles interpolate in Chromium */
+  @property --spinang { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+  @keyframes spinAng { to { --spinang: 360deg; } }
+  .av-frame-spin { position: relative; }
+  .av-frame-spin::after {
+    content: ""; position: absolute; inset: -5px; border-radius: 50%; pointer-events: none;
+    background: conic-gradient(from var(--spinang), #a855f7, #38bdf8, #f5c542, #ff5f95, #a855f7);
+    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4.5px), #000 calc(100% - 3.5px));
+    mask: radial-gradient(farthest-side, transparent calc(100% - 4.5px), #000 calc(100% - 3.5px));
+    animation: spinAng 3s linear infinite;
+  }
+  .av-frame-pulse { animation: framePulse 1.8s ease-in-out infinite; }
+  @keyframes framePulse {
+    0%, 100% { box-shadow: 0 0 0 2.5px var(--accent), 0 0 6px rgba(45,212,168,.35); }
+    50%      { box-shadow: 0 0 0 3.5px var(--accent), 0 0 18px rgba(45,212,168,.75); }
+  }
+  .pc-frame-pulse { animation: pcPulse 1.8s ease-in-out infinite; }
+  @keyframes pcPulse {
+    0%, 100% { border-color: var(--accent); box-shadow: 0 0 0 0 rgba(45,212,168,0); }
+    50%      { border-color: var(--accent); box-shadow: 0 0 16px rgba(45,212,168,.5); }
+  }
+
   /* profile card */
   #profileCard { position: fixed; display: none; width: 300px; background: var(--rail); border-radius: 14px; z-index: 420; box-shadow: 0 18px 60px rgba(0,0,0,.7); overflow: hidden; border: 1px solid var(--border); }
   #profileCard.show { display: block; }
@@ -286,6 +352,27 @@
   .pc-strip { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 9px; font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; }
   .pc-strip b { color: var(--text); }
   .pc-edit { width: 100%; margin-top: 12px; }
+
+  /* profile card frames (Astro) — never animated by fx classes, so the card stays stable */
+  #profileCard.pc-frame-gold    { border-color: #f5c542; }
+  #profileCard.pc-frame-neon    { border-color: #a855f7; }
+  #profileCard.pc-frame-fire    { border-color: #ff7a18; }
+  #profileCard.pc-frame-ice     { border-color: #7fd8ff; }
+  #profileCard.pc-frame-rainbow { animation: pcRainbow 5s linear infinite; }
+  #profileCard.pc-frame-galaxy  {
+    border-color: transparent;
+    background: linear-gradient(var(--rail), var(--rail)) padding-box,
+                linear-gradient(135deg, #a855f7, #38bdf8, #f5c542) border-box;
+  }
+  #profileCard.pc-frame-spin { border-color: transparent; }
+  #profileCard.pc-frame-spin::before {
+    content: ""; position: absolute; inset: 0; border-radius: 14px; padding: 2.5px; pointer-events: none;
+    background: conic-gradient(from var(--spinang), #a855f7, #38bdf8, #f5c542, #ff5f95, #a855f7);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor; mask-composite: exclude;
+    animation: spinAng 4s linear infinite;
+  }
 
   /* settings previews */
   .set-banner { height: 90px; border-radius: 10px; background-size: cover; background-position: center; border: 1px solid var(--border); }
@@ -1148,6 +1235,7 @@ function handleLive(m) {
     return;
   }
   if (m.type === "voice") { db.voiceStates = m.states || {}; syncVoicePeers(db.voiceStates); renderVoiceMembers(); return; }
+  if (m.type === "speaking") { db.speakingStates = m.states || {}; applySpeakingIndicators(); return; }
   if (m.type === "rtc") return handleRtcSignal(m.from, m.signal);
   if (m.type === "friend_request") { toast(`📨 ${m.from} sent you a friend request`); if (np().on && np().friend) { notifSound(); osNotify("📨 Friend Request", `${m.from} wants to be your friend`, () => openHome()); } refreshWorld(); return; }
   if (m.type === "friend_accepted") { toast(`🎉 You and ${m.user} are now friends!`); if (np().on && np().friend) { notifSound(); osNotify("🎉 Friend Added", `You and ${m.user} are now friends`, () => openHome()); } refreshWorld(); return; }
@@ -1180,6 +1268,7 @@ function callDisconnectAll() {
   remoteAudios.clear();
 }
 function stopMic() {
+  stopSelfSpeakingWatch();
   const c = window.__call;
   if (c.micStream) { c.micStream.getTracks().forEach(t => t.stop()); c.micStream = null; }
   if (c.micCtx) { try { c.micCtx.close(); } catch {} c.micCtx = null; }
@@ -1330,6 +1419,7 @@ async function ensureMic() {
     applyMicGain();
     /* honor current mute state */
     c.micStream.getAudioTracks().forEach(t => t.enabled = !db.ui.mute);
+    startSelfSpeakingWatch();
     return c.micStream;
   } catch (e) {
     if (e.name !== "NotAllowedError") toast("🎙️ Mic unavailable: " + e.message);
@@ -1369,6 +1459,7 @@ function attachRemoteAudio(peerName, stream) {
   document.body.appendChild(a);
   remoteAudios.set(peerName, a);
   setRemoteVolume(peerName);
+  startRemoteSpeakingWatch(peerName);
   /* output device routing (Chromium supports setSinkId) */
   const out = voicePrefs().spk;
   if (out && a.setSinkId) a.setSinkId(out).catch(() => {});
@@ -1385,6 +1476,119 @@ function voicePrefs() {
   return v;
 }
 function vpSave() { try { localStorage.setItem(vpKey(), JSON.stringify(window.__vp || voicePrefs())); } catch {} }
+
+/* ================= speaking indicators =================
+   My mic: WebAudio AnalyserNode watches local level. Remote peers: AnalyserNode per
+   remote <audio> element. Green ring shows when someone's mic picks up sound. */
+const SPEAK_THRESHOLD = 0.045;
+const speakingFlags = { self: false }; /* key: peer name or "self" */
+let selfAnalyser = null, selfRaf = 0;
+const remoteAnalysers = new Map(); /* peerName -> { ctx, src, an, data, raf } */
+let speakingPushTimer = 0, speakingPushState = false;
+
+function startSelfSpeakingWatch() {
+  const c = window.__call;
+  if (!c.micStream || selfAnalyser) return;
+  try {
+    if (!c.micCtx) applyMicGain();
+    const ctx = c.micCtx || new AudioContext();
+    const src = ctx.createMediaStreamSource(c.micStream);
+    const an = ctx.createAnalyser();
+    an.fftSize = 512; an.smoothingTimeConstant = 0.6;
+    src.connect(an); /* analyser taps the mic without routing it anywhere */
+    selfAnalyser = { ctx, src, an, data: new Uint8Array(an.frequencyBinCount) };
+    const tick = () => {
+      selfAnalyser.an.getByteFrequencyData(selfAnalyser.data);
+      let sum = 0;
+      for (let i = 0; i < selfAnalyser.data.length; i++) sum += selfAnalyser.data[i] * selfAnalyser.data[i];
+      const rms = Math.sqrt(sum / selfAnalyser.data.length) / 255;
+      const talking = !db.ui.mute && !db.ui.deaf && rms > SPEAK_THRESHOLD;
+      if (talking !== speakingFlags.self) {
+        speakingFlags.self = talking;
+        applySpeakingIndicators();
+        pushSpeakingState(talking);
+      }
+      selfRaf = requestAnimationFrame(tick);
+    };
+    selfRaf = requestAnimationFrame(tick);
+  } catch {}
+}
+function stopSelfSpeakingWatch() {
+  if (selfRaf) cancelAnimationFrame(selfRaf);
+  selfRaf = 0;
+  if (selfAnalyser) { try { selfAnalyser.src.disconnect(); } catch {} }
+  selfAnalyser = null;
+  if (speakingFlags.self) { speakingFlags.self = false; pushSpeakingState(false); }
+  applySpeakingIndicators();
+}
+function startRemoteSpeakingWatch(peerName) {
+  if (remoteAnalysers.has(peerName)) return;
+  const a = remoteAudios.get(peerName);
+  if (!a || !a.srcObject) return;
+  try {
+    const ctx = new AudioContext();
+    const src = ctx.createMediaStreamSource(a.srcObject);
+    const an = ctx.createAnalyser();
+    an.fftSize = 512; an.smoothingTimeConstant = 0.6;
+    src.connect(an);
+    const entry = { ctx, src, an, data: new Uint8Array(an.frequencyBinCount), raf: 0 };
+    remoteAnalysers.set(peerName, entry);
+    const tick = () => {
+      const e = remoteAnalysers.get(peerName);
+      if (!e) return;
+      e.an.getByteFrequencyData(e.data);
+      let sum = 0;
+      for (let i = 0; i < e.data.length; i++) sum += e.data[i] * e.data[i];
+      const rms = Math.sqrt(sum / e.data.length) / 255;
+      const talking = rms > SPEAK_THRESHOLD && !db.ui.deaf;
+      if (talking !== speakingFlags[peerName]) {
+        speakingFlags[peerName] = talking;
+        applySpeakingIndicators();
+      }
+      e.raf = requestAnimationFrame(tick);
+    };
+    entry.raf = requestAnimationFrame(tick);
+  } catch {}
+}
+function stopRemoteSpeakingWatch(peerName) {
+  const e = remoteAnalysers.get(peerName);
+  if (!e) return;
+  if (e.raf) cancelAnimationFrame(e.raf);
+  try { e.src.disconnect(); e.ctx.close(); } catch {}
+  remoteAnalysers.delete(peerName);
+  if (speakingFlags[peerName]) { speakingFlags[peerName] = false; applySpeakingIndicators(); }
+}
+function pushSpeakingState(talking) {
+  /* debounce network churn: only POST when the state actually flips, at most every 200ms */
+  const now = Date.now();
+  if (talking === speakingPushState && now - speakingPushTimer < 1000) return;
+  speakingPushState = talking; speakingPushTimer = now;
+  api("/api/voice/speaking", { body: { speaking: talking } }).catch(() => {});
+}
+function applySpeakingIndicators() {
+  /* server says who's talking (authoritative for others); local flags cover me + jitter */
+  const srv = db.speakingStates || {};
+  const talkers = new Set();
+  if (speakingFlags.self) talkers.add("me");
+  for (const k of Object.keys(speakingFlags)) if (k !== "self" && speakingFlags[k]) talkers.add(k);
+  for (const [n] of Object.entries(srv)) if (srv[n]) talkers.add(n);
+  document.querySelectorAll(".speaking").forEach(el => el.classList.remove("speaking"));
+  if (!db.ui.voice) return;
+  talkers.forEach(n => {
+    if (n === "me" || n === currentUser) {
+      document.querySelectorAll(".speaking-eligible").forEach(el => el.classList.add("speaking"));
+    } else {
+      document.querySelectorAll(`[data-vmemspeaker="${CSS.escape(n)}"]`).forEach(el => el.classList.add("speaking"));
+      const vr = document.querySelector(`[data-vpeer="${CSS.escape(n)}"]`);
+      if (vr) vr.classList.add("speaking");
+      /* member list in the server view */
+      document.querySelectorAll(`.mem.carded[data-memid="${CSS.escape(n)}"] .av`).forEach(el => el.classList.add("speaking"));
+    }
+  });
+  /* my own avatars: voice panel chip, sidebar voice members, member list "me" row */
+  document.querySelectorAll('.mem.carded[data-memid="me"], .mem.carded[data-memid="' + CSS.escape(currentUser) + '"]')
+    .forEach(el => el.querySelector(".av")?.classList.add("speaking"));
+}
 
 function myVoiceState() {
   if (!db.ui.voice) return null;
@@ -1448,6 +1652,7 @@ function dropPeer(peerName) {
   rtcIncoming.delete(peerName);
   const a = remoteAudios.get(peerName);
   if (a) { try { a.srcObject = null; a.remove(); } catch {} remoteAudios.delete(peerName); }
+  stopRemoteSpeakingWatch(peerName);
   renderVoiceMembers();
 }
 function dropAllPeers() {
@@ -1661,6 +1866,8 @@ async function doLogin() {
 }
 
 function localViewFromWorld(w) {
+  /* frames live on the server profile — copy them onto the local view so avatarHTML can use them */
+  if (w.profile) { w.profile.avatarFrame = w.profile.avatarFrame || "none"; w.profile.profileFrame = w.profile.profileFrame || "none"; }
   /* voice states from the server (live list, replaced on every /api/voice broadcast) */
   /* shape the server's world payload into the local `db` view the UI already renders */
   const unreads = {};
@@ -1676,6 +1883,7 @@ function localViewFromWorld(w) {
     people: w.people || {},
     online: new Set(w.online || []),
     voiceStates: w.voice || {},
+    speakingStates: {},
     bots: [],
     ui: { view: "dms", serverId: null, channelId: null, dmId: null, collapsed: {}, voice: null, mute: false, deaf: false, showMembers: true, theme: db?.ui?.theme || "purple", font: db?.ui?.font || "serif" },
   };
@@ -1999,6 +2207,8 @@ function loadWorld() {
   db.user = (loadUsers()[currentUser] || {}).profile || db.user || { name: currentUser, color: "#2dd4a8", status: "online" };
   /* make sure older saved profiles get the new fields */
   for (const k of ["displayName", "pronouns", "customStatus", "bio", "nameEffect", "profileEffect", "badges"]) if (!(k in db.user)) db.user[k] = typeof db.user[k] === "boolean" ? false : (k === "badges" ? ["member"] : "");
+  if (!("avatarFrame" in db.user)) db.user.avatarFrame = "none";
+  if (!("profileFrame" in db.user)) db.user.profileFrame = "none";
   if (!("avatar" in db.user)) db.user.avatar = null;
   if (!("banner" in db.user)) db.user.banner = null;
   if (!("created" in db.user)) db.user.created = Date.now();
@@ -2018,6 +2228,7 @@ function persistProfile(changedSlots) {
   const body = {
     displayName: u.displayName, pronouns: u.pronouns, customStatus: u.customStatus, bio: u.bio,
     color: u.color, status: u.status, nameEffect: u.nameEffect, profileEffect: u.profileEffect, badges: u.badges,
+    avatarFrame: u.avatarFrame, profileFrame: u.profileFrame,
   };
   (async () => {
     try {
@@ -2049,7 +2260,7 @@ function member(id) {
   const p = (db.people || {})[norm(id)] || (db.people || {})[id];
   if (p) {
     const pr = p.profile || {};
-    return { id: p.name, name: p.name, displayName: pr.displayName, color: pr.color || "#9d6bff", status: (db.online && db.online.has && db.online.has(p.name)) ? (pr.status || "online") : "offline", nameEffect: pr.nameEffect, profileEffect: pr.profileEffect, badges: pr.badges, avatarData: p.avatarData, bannerData: p.bannerData, pronouns: pr.pronouns, customStatus: pr.customStatus, bio: pr.bio, created: p.created };
+    return { id: p.name, name: p.name, displayName: pr.displayName, color: pr.color || "#9d6bff", status: (db.online && db.online.has && db.online.has(p.name)) ? (pr.status || "online") : "offline", nameEffect: pr.nameEffect, profileEffect: pr.profileEffect, avatarFrame: pr.avatarFrame, profileFrame: pr.profileFrame, badges: pr.badges, avatarData: p.avatarData, bannerData: p.bannerData, pronouns: pr.pronouns, customStatus: pr.customStatus, bio: pr.bio, created: p.created };
   }
   return { id, name: id || "Unknown", color: "#64748b", status: "offline" };
 }
@@ -2216,7 +2427,7 @@ function renderVoiceMembers() {
       const m = member(n);
       const hasStream = rtcIncoming.has(n);
       const label = s.sharing === "screen" ? "🖥️ sharing screen" : s.sharing === "cam" ? "📷 camera on" : s.sharing === "both" ? "🖥️📷 screen + camera" : "🔊 in voice";
-      return `<div class="mem vrow" data-vpeer="${esc(n)}">
+      return `<div class="mem vrow" data-vpeer="${esc(n)}" data-vmemspeaker="${esc(n)}">
         ${avatarHTML(m, "sm")}
         <div style="min-width:0;flex:1"><div class="mem-name">${esc(displayName(m))}</div><div class="mem-status-line">${label}${s.sharing ? ` · ${esc(s.quality)}` : ""}</div></div>
         ${hasStream ? `<button class="cb-btn watch" data-watch="${esc(n)}" title="Watch ${esc(displayName(m))}">▶</button>` : s.sharing ? `<span style="color:var(--muted);font-size:11px">connecting…</span>` : ""}
@@ -2228,6 +2439,7 @@ function renderVoiceMembers() {
     const tile = wrap.querySelector(`[data-vpeer="${n}"] video`);
     if (tile && tile.srcObject !== stream) tile.srcObject = stream;
   }
+  applySpeakingIndicators();
 }
 
 function userPanelHTML() {
@@ -2245,7 +2457,7 @@ function userPanelHTML() {
 function avatarHTML(m, size, cls) {
   const url = m.id === "me" ? mediaUrls.avatar : (m.avatarData || null);
   const img = url ? `<img class="av-img" src="${url}" alt="">` : `<span style="width:100%;height:100%;border-radius:50%;background:${esc(m.color)};display:grid;place-items:center">${initials(displayName(m))}</span>`;
-  return `<span class="av ${size || ""} ${cls || ""}">${img}<span class="st ${m.status}"></span></span>`;
+  return `<span class="av ${size || ""} ${cls || ""} ${frameClass(AV_FRAME_KEY, m)}">${img}<span class="st ${m.status}"></span></span>`;
 }
 
 /* ---------- profile card ---------- */
@@ -2282,6 +2494,9 @@ function showProfileCard(anchorEl) {
   pc.classList.remove(...Object.values(PROFILE_EFFECTS).map(v => v.cls).filter(Boolean));
   const fx = PROFILE_EFFECTS[u.profileEffect]?.cls;
   if (fx) pc.classList.add(fx);
+  pc.classList.remove(...Object.values(PROFILE_CARD_FRAMES).map(v => v.cls).filter(Boolean));
+  const pcf = frameClass(PC_FRAME_KEY, u);
+  if (pcf) pc.classList.add(pcf);
   pc.classList.add("show");
   const r = anchorEl.getBoundingClientRect();
   const w = 300, h = pc.offsetHeight || 380;
@@ -2308,7 +2523,7 @@ function membersHTML() {
     .map(r => `<span class="rank-chip" style="background:${r.color}22; color:${r.color}"><span class="rank-dot" style="background:${r.color}"></span>${esc(r.name)}</span>`).join(" ");
   const row = name => {
     const m = member(name);
-    return `<div class="mem carded" data-memcard data-memid="${esc(name)}" title="View profile">${avatarHTML(m, "sm")}
+    return `<div class="mem carded speaking-eligible" data-memcard data-memid="${esc(name)}" title="View profile">${avatarHTML(m, "sm")}
       <div style="min-width:0">
         <div class="mem-name">${esc(displayName(m))}${m.pronouns ? `<span class="mem-tag">${esc(m.pronouns)}</span>` : ""}</div>
         <div class="mem-status-line"><span class="ms-dot ${m.status}"></span>${esc(m.customStatus || stName(m.status))}</div>
@@ -2372,6 +2587,33 @@ const PROFILE_EFFECTS = {
   matrix:    { name: "🌿 Matrix Rain", cls: "profile-fx-matrix" },
   neonframe: { name: "🟣 Neon Frame", cls: "profile-fx-neonframe" },
 };
+
+/* avatar/profile frames (Astro) — keyed by profileEffect, no conflict with fx classes */
+const AVATAR_FRAMES = {
+  none:    { name: "None", cls: "" },
+  gold:    { name: "🥇 Golden", cls: "av-frame-gold" },
+  neon:    { name: "🟣 Neon", cls: "av-frame-neon" },
+  fire:    { name: "🔥 Fire", cls: "av-frame-fire" },
+  ice:     { name: "❄️ Ice", cls: "av-frame-ice" },
+  rainbow: { name: "🌈 Rainbow", cls: "av-frame-rainbow" },
+  galaxy:  { name: "🌌 Galaxy", cls: "av-frame-galaxy" },
+  spin:    { name: "🌀 Spin", cls: "av-frame-spin" },
+  pulse:   { name: "💚 Pulse", cls: "av-frame-pulse" },
+};
+const PROFILE_CARD_FRAMES = {
+  none:    { name: "None", cls: "" },
+  gold:    { name: "🥇 Golden", cls: "pc-frame-gold" },
+  neon:    { name: "🟣 Neon", cls: "pc-frame-neon" },
+  fire:    { name: "🔥 Fire", cls: "pc-frame-fire" },
+  ice:     { name: "❄️ Ice", cls: "pc-frame-ice" },
+  rainbow: { name: "🌈 Rainbow", cls: "pc-frame-rainbow" },
+  galaxy:  { name: "🌌 Galaxy", cls: "pc-frame-galaxy" },
+  spin:    { name: "🌀 Spin", cls: "pc-frame-spin" },
+  pulse:   { name: "💚 Pulse", cls: "pc-frame-pulse" },
+};
+const AV_FRAME_KEY = "avatarFrame";
+const PC_FRAME_KEY = "profileFrame";
+function frameClass(key, u) { return key === AV_FRAME_KEY ? AVATAR_FRAMES[u[key]]?.cls || "" : PROFILE_CARD_FRAMES[u[key]]?.cls || ""; }
 
 /* ---------- attachments ---------- */
 function embedHTML(m) {
@@ -2593,6 +2835,7 @@ function renderSidebar() { $("#sidebar").innerHTML = sidebarHTML(); setTimeout(r
 function renderMembers() { $("#members").innerHTML = membersHTML(); }
 function renderAll() {
   renderRail(); renderSidebar(); renderMain(); renderMembers();
+  setTimeout(applySpeakingIndicators);
   document.title = db.ui.view === "server" ? `#${curChan().name} · Disglobe` : db.ui.dmId ? `${member(db.ui.dmId).name} · Disglobe` : "Disglobe";
 }
 let pinned = true;
@@ -3071,6 +3314,12 @@ function renderSettingsPane() {
       <h2 class="set-h2" style="margin-top:24px">Profile effects</h2>
       <p class="f-note" style="margin-bottom:10px">Animate your profile card — everyone who opens your profile sees them.</p>
       <div class="seg" id="astProfFx" style="flex-wrap:wrap">${Object.entries(PROFILE_EFFECTS).map(([k, v]) => `<button data-k="${k}" class="${(u.profileEffect || "none") === k ? "on" : ""}">${v.name}</button>`).join("")}</div>
+      <h2 class="set-h2" style="margin-top:24px">Avatar frames</h2>
+      <p class="f-note" style="margin-bottom:10px">Rings around your profile picture everywhere it shows — chat, member lists, DMs.</p>
+      <div class="seg" id="astAvFrames" style="flex-wrap:wrap">${Object.entries(AVATAR_FRAMES).map(([k, v]) => `<button data-k="${k}" class="${(u.avatarFrame || "none") === k ? "on" : ""}">${v.name}</button>`).join("")}</div>
+      <h2 class="set-h2" style="margin-top:24px">Profile card frames</h2>
+      <p class="f-note" style="margin-bottom:10px">Borders around your profile card when someone opens your profile.</p>
+      <div class="seg" id="astPcFrames" style="flex-wrap:wrap">${Object.entries(PROFILE_CARD_FRAMES).map(([k, v]) => `<button data-k="${k}" class="${(u.profileFrame || "none") === k ? "on" : ""}">${v.name}</button>`).join("")}</div>
       <div class="mo-foot" style="padding:24px 0"><button class="btn primary" id="astSave">Save Effects</button></div>`;
     const claim = pane.querySelector("#astroClaim");
     if (claim) claim.onclick = () => {
@@ -3092,6 +3341,18 @@ function renderSettingsPane() {
       const b = e.target.closest("button"); if (!b) return;
       u.profileEffect = b.dataset.k;
       [...profSeg.children].forEach(x => x.classList.toggle("on", x === b));
+    });
+    const avFrameSeg = pane.querySelector("#astAvFrames");
+    const pcFrameSeg = pane.querySelector("#astPcFrames");
+    avFrameSeg.addEventListener("click", e => {
+      const b = e.target.closest("button"); if (!b) return;
+      u.avatarFrame = b.dataset.k;
+      [...avFrameSeg.children].forEach(x => x.classList.toggle("on", x === b));
+    });
+    pcFrameSeg.addEventListener("click", e => {
+      const b = e.target.closest("button"); if (!b) return;
+      u.profileFrame = b.dataset.k;
+      [...pcFrameSeg.children].forEach(x => x.classList.toggle("on", x === b));
     });
     pane.querySelector("#astSave").onclick = () => {
       persistProfile();
@@ -4283,14 +4544,14 @@ document.addEventListener("keydown", e => {
 
 $("#sidebar").addEventListener("click", e => {
   const mute = e.target.closest("#btnMute");
-  if (mute) { db.ui.mute = !db.ui.mute; if (window.__call.micStream) window.__call.micStream.getAudioTracks().forEach(t => t.enabled = !db.ui.mute); save(); renderSidebar(); toast(db.ui.mute ? "🎙️ Muted" : "🎙️ Unmuted"); return; }
+  if (mute) { db.ui.mute = !db.ui.mute; if (window.__call.micStream) window.__call.micStream.getAudioTracks().forEach(t => t.enabled = !db.ui.mute); save(); renderSidebar(); applySpeakingIndicators(); toast(db.ui.mute ? "🎙️ Muted" : "🎙️ Unmuted"); return; }
   const deaf = e.target.closest("#btnDeaf");
   if (deaf) {
     db.ui.deaf = !db.ui.deaf;
     if (db.ui.deaf) { db.ui.mute = true; if (window.__call.micStream) window.__call.micStream.getAudioTracks().forEach(t => t.enabled = false); }
     else if (window.__call.micStream) window.__call.micStream.getAudioTracks().forEach(t => t.enabled = true);
     remoteAudios.forEach((a, n) => setRemoteVolume(n));
-    save(); renderSidebar(); toast(db.ui.deaf ? "🎧 Deafened" : "🎧 Undeafened");
+    save(); renderSidebar(); applySpeakingIndicators(); toast(db.ui.deaf ? "🎧 Deafened" : "🎧 Undeafened");
     return;
   }
   const settings = e.target.closest("#btnSettings");
@@ -4313,7 +4574,7 @@ $("#sidebar").addEventListener("click", e => {
   }
   /* call bar */
   if (e.target.closest("#cbMute")) {
-    db.ui.mute = !db.ui.mute; save(); renderSidebar();
+    db.ui.mute = !db.ui.mute; save(); renderSidebar(); applySpeakingIndicators();
     if (window.__call.micStream) window.__call.micStream.getAudioTracks().forEach(t => t.enabled = !db.ui.mute);
     toast(db.ui.mute ? "🎙️ Muted" : "🎙️ Unmuted");
     return;
@@ -4323,7 +4584,7 @@ $("#sidebar").addEventListener("click", e => {
     if (db.ui.deaf) { db.ui.mute = true; if (window.__call.micStream) window.__call.micStream.getAudioTracks().forEach(t => t.enabled = false); }
     else if (window.__call.micStream) window.__call.micStream.getAudioTracks().forEach(t => t.enabled = true);
     remoteAudios.forEach((a, n) => setRemoteVolume(n));
-    save(); renderSidebar();
+    save(); renderSidebar(); applySpeakingIndicators();
     toast(db.ui.deaf ? "🎧 Deafened" : "🎧 Undeafened");
     return;
   }
