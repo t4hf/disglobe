@@ -207,6 +207,36 @@
   #callBar .cb-sep { width: 1px; background: var(--border); margin: 3px 2px; }
   #callBar .cb-btn svg { width: 17px; height: 17px; }
 
+  /* ---- call bar v2: icon tiles with live screen preview + red slashes ---- */
+  #callBar .cb-btn { position: relative; overflow: visible; font-size: 0; }
+  #callBar .cb-ico { width: 19px; height: 19px; display: block; }
+  #callBar .cb-btn .cb-slash {
+    display: none; position: absolute; left: 0; right: 0; top: 50%; height: 3px; margin-top: -1.5px;
+    background: var(--danger, #f23f43); border-radius: 2px; transform: rotate(-40deg);
+    box-shadow: 0 1px 3px rgba(0,0,0,.45); pointer-events: none;
+  }
+  #callBar .cb-btn.danger-on { background: rgba(218,55,60,.16); color: #f26d71; box-shadow: inset 0 0 0 1.5px #da373c; }
+  #callBar .cb-btn.danger-on:hover { background: rgba(218,55,60,.28); color: #ff8a8d; }
+  #callBar .cb-btn.danger-on .cb-slash { display: block; }
+  /* live screen preview inside the share tile */
+  #callBar .cb-live {
+    display: none; position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+    width: 168px; padding: 5px 5px 4px; border-radius: 10px; background: var(--rail, #1e1f22);
+    border: 1px solid var(--border, #3f4147); box-shadow: 0 10px 28px rgba(0,0,0,.55);
+    z-index: 60; pointer-events: none;
+  }
+  #callBar .cb-live video { width: 100%; border-radius: 7px; background: #000; aspect-ratio: 16 / 9; object-fit: contain; display: block; }
+  #callBar .cb-live .cb-live-tag {
+    display: flex; align-items: center; gap: 6px; margin-top: 4px; padding: 0 2px;
+    color: #23a55a; font-size: 10.5px; font-weight: 800; letter-spacing: .6px; text-transform: uppercase;
+  }
+  #callBar .cb-live .cb-live-dot { width: 7px; height: 7px; border-radius: 50%; background: #23a55a; animation: liveDot 1.4s ease-in-out infinite; }
+  @keyframes liveDot { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+  #callBar .cb-btn.sharing { background: rgba(35,165,90,.16); color: #3ddc84; box-shadow: inset 0 0 0 1.5px #23a55a; }
+  #callBar .cb-btn.sharing:hover { background: rgba(35,165,90,.28); color: #6fe8a5; }
+  #callBar .cb-btn.sharing .cb-live { display: block; }
+  #callBar .cb-btn.cam-on { background: rgba(35,165,90,.16); color: #3ddc84; box-shadow: inset 0 0 0 1.5px #23a55a; }
+
   /* ---- stream viewer overlay ---- */
   #streamView { position: fixed; inset: 0; background: #000; z-index: 220; display: none; flex-direction: column; }
   #streamView.show { display: flex; }
@@ -240,10 +270,11 @@
   #meChip:hover { background: var(--hover); }
   #meChip .me-name { font-size: 13.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #meChip .me-status { font-size: 11.5px; color: var(--muted); }
-  .pbtn { width: 32px; height: 32px; border-radius: 6px; display: grid; place-items: center; color: var(--muted); flex: none; }
+  .pbtn { width: 32px; height: 32px; border-radius: 6px; display: grid; place-items: center; color: var(--muted); flex: none; position: relative; }
   .pbtn:hover { background: var(--hover); color: var(--text); }
   .pbtn svg { width: 19px; height: 19px; }
   .pbtn.off { color: var(--danger); }
+  .pbtn.off::after { content: ""; position: absolute; left: 5px; right: 5px; top: 50%; height: 2.5px; margin-top: -1.25px; background: var(--danger, #f23f43); border-radius: 2px; transform: rotate(-40deg); box-shadow: 0 1px 3px rgba(0,0,0,.45); }
 
   /* ---------------- avatars ---------------- */
   .av {
@@ -1050,6 +1081,9 @@ const I = (name, cls) => {
     gear: '<path fill="currentColor" d="M19.43 12.98c.04-.32.07-.64.07-.98s-.03-.66-.07-.98l2.11-1.65a.5.5 0 0 0 .12-.64l-2-3.46a.5.5 0 0 0-.61-.22l-2.49 1a7.3 7.3 0 0 0-1.69-.98l-.38-2.65A.49.49 0 0 0 14 2h-4a.49.49 0 0 0-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1a.5.5 0 0 0-.61.22l-2 3.46a.5.5 0 0 0 .12.64L4.57 11c-.04.32-.07.64-.07.98s.03.66.07.98l-2.11 1.65a.5.5 0 0 0-.12.64l2 3.46c.14.24.42.34.61.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.38-2.65a7.3 7.3 0 0 0 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46a.5.5 0 0 0-.12-.64l-2.11-1.65zM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"/>',
     mic: '<rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="2"/><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3.5"/>',
     head: '<path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M4 13a8 8 0 0 1 16 0"/><rect x="3" y="13" width="4.5" height="7" rx="2" fill="currentColor"/><rect x="16.5" y="13" width="4.5" height="7" rx="2" fill="currentColor"/>',
+    screen: '<rect x="3" y="4.5" width="18" height="12.5" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M9 20.5h6M12 17v3.5"/>',
+    cam: '<rect x="2.5" y="6" width="13" height="12" rx="3" fill="none" stroke="currentColor" stroke-width="2"/><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="m15.5 12 6-3.5v7L15.5 12z"/>',
+    hangup: '<path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M4 14c5-4.2 11-4.2 16 0l-2.6 3.1c-1.4-1-2.9-1.7-4.4-1.9v3.2a12 12 0 0 1-2 0v-3.2c-1.5.2-3 .9-4.4 1.9L4 14z"/>',
     search: '<circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path stroke="currentColor" stroke-width="2" stroke-linecap="round" d="m16 16 5 5"/>',
     members: '<path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M17 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9.5" cy="7" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M22 21v-2a4 4 0 0 0-3-3.9M15.5 3.1a4 4 0 0 1 0 7.8"/>',
     pin: '<path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M9 4h6l1 6 3 3v2H5v-2l3-3 1-6zM12 15v6"/>',
@@ -2400,11 +2434,18 @@ function voicePanelHTML() {
       <button class="vp-disc" id="btnDisconnect">Disconnect</button>
     </div>
     <div id="callBar">
-      <button class="cb-btn ${db.ui.mute ? "danger-on" : ""}" id="cbMute" title="${db.ui.mute ? "Unmute" : "Mute"}">🎙️</button>
-      <button class="cb-btn ${db.ui.deaf ? "danger-on" : ""}" id="cbDeaf" title="${db.ui.deaf ? "Undeafen" : "Deafen"}">🎧</button>
-      <button class="cb-btn ${camOn ? "cam-on" : ""}" id="cbCam" title="Turn on camera">📷</button>
-      <button class="cb-btn ${sharing ? "sharing" : ""}" id="cbShare" title="Share your screen">🖥️</button>
-      <button class="cb-btn danger-on" id="cbHangup" title="Disconnect">📞</button>
+      <button class="cb-btn ${db.ui.mute ? "danger-on" : ""}" id="cbMute" title="${db.ui.mute ? "Unmute" : "Mute"}">
+        <span class="cb-slash"></span>${I("mic", "cb-ico")}
+      </button>
+      <button class="cb-btn ${db.ui.deaf ? "danger-on" : ""}" id="cbDeaf" title="${db.ui.deaf ? "Undeafen" : "Deafen"}">
+        <span class="cb-slash"></span>${I("head", "cb-ico")}
+      </button>
+      <button class="cb-btn ${camOn ? "cam-on" : ""}" id="cbCam" title="Turn on camera">${I("cam", "cb-ico")}</button>
+      <button class="cb-btn ${sharing ? "sharing" : ""}" id="cbShare" title="Share your screen">
+        ${I("screen", "cb-ico")}
+        <span class="cb-live"><video id="cbLiveVideo" autoplay muted playsinline></video><span class="cb-live-tag"><span class="cb-live-dot"></span>LIVE</span></span>
+      </button>
+      <button class="cb-btn danger-on" id="cbHangup" title="Disconnect">${I("hangup", "cb-ico")}</button>
     </div>
     <div class="vp-avatars"><span class="mini-av">${mediaUrls.avatar ? `<img src="${mediaUrls.avatar}" alt="">` : `<span style="width:100%;height:100%;border-radius:50%;background:${esc(db.user.color)};display:grid;place-items:center">${initials(displayName(db.user))}</span>`}</span></div>
     <div id="voiceMembersLive"></div>
@@ -2438,6 +2479,13 @@ function renderVoiceMembers() {
   for (const [n, stream] of rtcIncoming) {
     const tile = wrap.querySelector(`[data-vpeer="${n}"] video`);
     if (tile && tile.srcObject !== stream) tile.srcObject = stream;
+  }
+  /* feed the live screen preview in the call bar's share tile */
+  const liveVid = $("#cbLiveVideo");
+  if (liveVid) {
+    const mine = window.__call.shareStream;
+    if (mine && liveVid.srcObject !== mine) liveVid.srcObject = mine;
+    if (!mine && liveVid.srcObject) liveVid.srcObject = null;
   }
   applySpeakingIndicators();
 }
