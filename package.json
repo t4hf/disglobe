@@ -1,7 +1,7 @@
 {
   "name": "disglobe",
   "productName": "Disglobe",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "description": "Disglobe — an original Discord-style chat world: accounts, servers, DMs, voice and screenshare in one zero-dependency app",
   "main": "main.js",
   "author": "Disglobe",
