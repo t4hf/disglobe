@@ -111,15 +111,6 @@
   .rail-item.active.home { background: var(--accent-dim); color: var(--accent); box-shadow: 0 0 0 1.5px rgba(157,78,221,.45), 0 0 14px 3px var(--glow-soft); }
   .rail-item.home { background: var(--card); }
   .rail-item.home svg { width: 28px; height: 28px; }
-  .rail-item.dm-av-chip { overflow: visible; }
-  .rail-item.dm-av-chip .av { width: 44px; height: 44px; font-size: 16px; }
-  .rail-item.dm-av-chip .av .st { width: 14px; height: 14px; border-width: 3px; }
-  .rail-item.dm-av-chip.unread::after {
-    content: ""; position: absolute; top: 4px; right: 4px; width: 10px; height: 10px;
-    border-radius: 50%; background: var(--text); border: 2px solid var(--bg, #0d0a15);
-    animation: dmDotPulse 1.6s ease-in-out infinite;
-  }
-  @keyframes dmDotPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.25); } }
   .rail-pill {
     position: absolute; left: -14px; width: 4px; border-radius: 0 4px 4px 0;
     background: var(--text); transition: height .18s ease, opacity .18s ease;
@@ -2392,23 +2383,13 @@ function railHTML() {
     <div class="rail-sep"></div>
     ${items}
     <div class="rail-item add" id="railAdd" data-tip="Join or create a server">${I("plus")}</div>
-    ${dmAvatarsHTML()}`;
+    ${""}
+    `;
 }
 
-/* your open DMs, as avatar chips in the server rail — click one to jump straight in */
-function dmAvatarsHTML() {
-  if (!db.dms.length) return "";
-  return `<div class="rail-sep"></div>` + db.dms.map(d => {
-    const id = typeof d === "string" ? d : d.id;
-    const m = member(id);
-    const active = db.ui.view === "dms" && db.ui.dmId === id;
-    const unread = db.unreads[`dm:${id}`];
-    return `<div class="rail-item dm-av-chip ${active ? "active" : ""} ${unread ? "unread" : ""}" data-dmrail="${esc(id)}" data-tip="${esc(displayName(m))} — direct messages">
-      <span class="rail-pill"></span>
-      <span class="dm-av-wrap">${avatarHTML(m, "sm")}</span>
-    </div>`;
-  }).join("");
-}
+/* DM avatar chips in the rail were removed by design — new DMs surface in the
+   Home view + unread badge instead. Kept no-op so old callers don't break. */
+function dmAvatarsHTML() { return ""; }
 
 function channelRowHTML(s, cat, ch) {
   const key = `s:${s.id}:${ch.id}`;
@@ -3074,7 +3055,7 @@ function cancelEdit() { editingId = null; renderMain(); }
 
 /* ================= attachments: pick, paste, drop ================= */
 
-const MAX_FILE = 25 * 1048576;     // 25 MB per file
+const MAX_FILE = 50 * 1048576;     // 50 MB per file (animated GIFs need the room)
 const MAX_ATTACHMENTS = 4;         // per message
 let pending = [];                  // staged attachments
 
@@ -3534,7 +3515,9 @@ function renderSettingsPane() {
       ${h("Language")}
       <div class="set-row2"><div class="rl">Display language</div><div class="seg" style="width:260px"><button class="on">English (US)</button><button>More soon…</button></div></div>`;
   } else if (settingsOpenPane === "updates") {
-    const inExe = typeof disglobeAppVersion === "function";
+    /* the exe loads this page from the server, so detect it via user-agent —
+       preload-bridge scope checks don't work from the page script world */
+    const inExe = /Electron/i.test(navigator.userAgent);
     if (!inExe) {
       pane.innerHTML = `
         ${h("Updates")}
@@ -4438,8 +4421,6 @@ $("#rail").addEventListener("click", e => {
     const first = s.categories.flatMap(c => c.channels).find(c => c.type === "text");
     if (first) openChannel(s.id, first.id);
   }
-  const dmChip = e.target.closest("[data-dmrail]");
-  if (dmChip) return openDM(dmChip.dataset.dmrail);
 });
 
 $("#sidebar").addEventListener("click", e => {

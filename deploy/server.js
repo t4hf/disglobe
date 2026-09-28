@@ -91,7 +91,7 @@ const pendingCount = new Map(); // key -> unsaved message count for pg mode
 const PORT = Number(process.env.DISGLOBE_PORT || 3849);
 const DATA_DIR = path.join(__dirname, "disglobe-data");
 const DB_FILE = path.join(DATA_DIR, "db.json");
-const BODY_LIMIT = 180 * 1024 * 1024; // allows several 25MB attachments (base64-inflated)
+const BODY_LIMIT = 300 * 1024 * 1024; // allows a 50MB attachment + headroom (base64-inflated)
 
 /* ---------------- tiny JSON db with debounced saves ---------------- */
 let db = {
@@ -363,8 +363,8 @@ async function handle(req, res) {
     const u = db.users[me];
     const allowed = ["displayName", "pronouns", "customStatus", "bio", "color", "status", "nameEffect", "profileEffect", "badges", "avatarFrame", "profileFrame"];
     for (const k of allowed) if (k in body) u.profile[k] = body[k];
-    if (body.avatarData && String(body.avatarData).length < 2 * 1024 * 1024) u.avatarData = body.avatarData;
-    if (body.bannerData && String(body.bannerData).length < 3 * 1024 * 1024) u.bannerData = body.bannerData;
+    if (body.avatarData && String(body.avatarData).length < 20 * 1024 * 1024) u.avatarData = body.avatarData;
+    if (body.bannerData && String(body.bannerData).length < 70 * 1024 * 1024) u.bannerData = body.bannerData;
     if (body.avatarData === null) u.avatarData = null;
     if (body.bannerData === null) u.bannerData = null;
     saveSoon();
@@ -559,7 +559,7 @@ async function handle(req, res) {
     const msg = pushMsg(key, {
       id: uid(), uid: me, ts: Date.now(),
       text: String(body.text || "").slice(0, 4000),
-      attachments: atts.map(a => ({ id: uid(), name: String(a.name || "file").slice(0, 80), size: Number(a.size) || 0, kind: a.kind === "image" ? "image" : "file", dataUrl: String(a.dataUrl || "").slice(0, 40 * 1024 * 1024) })),
+      attachments: atts.map(a => ({ id: uid(), name: String(a.name || "file").slice(0, 80), size: Number(a.size) || 0, kind: a.kind === "image" ? "image" : "file", dataUrl: String(a.dataUrl || "").slice(0, 70 * 1024 * 1024) })),
       replyTo: body.replyTo || undefined,
     });
     broadcast(key, { type: "message", key, msg });
