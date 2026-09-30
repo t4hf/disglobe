@@ -1,6 +1,6 @@
 {
   "name": "disglobe-server",
-  "version": "2.0.7",
+  "version": "2.0.8",
   "description": "Disglobe online backend — accounts, servers, messages, WebSocket realtime, WebRTC signaling, optional PostgreSQL",
   "main": "server.js",
   "author": "Disglobe",
