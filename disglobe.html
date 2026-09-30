@@ -117,6 +117,13 @@
     height: 8px; opacity: 0; pointer-events: none;
   }
   .rail-item:hover .rail-pill, .rail-item.unread .rail-pill { height: 20px; opacity: 1; }
+  /* unread ping on the Home globe when a new DM arrives */
+  .rail-item.home.has-dm::after {
+    content: ""; position: absolute; top: 2px; right: 2px; width: 12px; height: 12px;
+    border-radius: 50%; background: var(--text); border: 2.5px solid var(--rail, #0d0a15);
+    animation: homeDmPulse 1.6s ease-in-out infinite; pointer-events: none;
+  }
+  @keyframes homeDmPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.25); } }
   .rail-item.active .rail-pill { height: 36px; background: var(--accent); box-shadow: 0 0 10px 2px var(--glow-soft); }
   .rail-sep { width: 32px; height: 2px; background: var(--border); border-radius: 1px; flex: none; }
   .rail-item.add { color: var(--accent); background: var(--card); }
@@ -2377,8 +2384,10 @@ function railHTML() {
     return `<div class="rail-item ${active ? "active" : ""} ${unread ? "unread" : ""}" data-server="${s.id}" data-tip="${esc(s.name)}">
       <span class="rail-pill"></span>${esc(s.emoji)}</div>`;
   }).join("");
+  /* the old rail chips are gone — unread DMs ping on the Home globe instead */
+  const dmUnread = Object.keys(db.unreads || {}).some(k => k.startsWith("dm:") && db.unreads[k]);
   return `
-    <div class="rail-item home ${db.ui.view === "dms" ? "active" : ""}" data-home data-tip="Direct Messages">
+    <div class="rail-item home ${db.ui.view === "dms" ? "active" : ""} ${dmUnread ? "has-dm" : ""}" data-home data-tip="Direct Messages">
       <span class="rail-pill"></span>${I("globe")}</div>
     <div class="rail-sep"></div>
     ${items}
